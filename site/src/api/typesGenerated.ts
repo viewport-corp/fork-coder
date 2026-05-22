@@ -2165,6 +2165,14 @@ export const ChatGoalMutationActions: ChatGoalMutationAction[] = [
 ];
 
 // From codersdk/chats.go
+/**
+ * ChatGoalResponse is returned by chat goal lifecycle endpoints.
+ */
+export interface ChatGoalResponse {
+	readonly goal?: ChatGoal;
+}
+
+// From codersdk/chats.go
 export type ChatGoalStatus =
 	| "active"
 	| "cleared"
@@ -3161,6 +3169,7 @@ export type ChatWatchEventKind =
 	| "created"
 	| "deleted"
 	| "diff_status_change"
+	| "goal_change"
 	| "status_change"
 	| "summary_change"
 	| "title_change";
@@ -3170,6 +3179,7 @@ export const ChatWatchEventKinds: ChatWatchEventKind[] = [
 	"created",
 	"deleted",
 	"diff_status_change",
+	"goal_change",
 	"status_change",
 	"summary_change",
 	"title_change",
@@ -3400,6 +3410,7 @@ export interface CreateChatMessageResponse {
 	readonly message?: ChatMessage;
 	readonly queued_message?: ChatQueuedMessage;
 	readonly queued: boolean;
+	readonly goal?: ChatGoal;
 	readonly warnings?: readonly string[];
 }
 
