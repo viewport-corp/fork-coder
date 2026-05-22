@@ -12201,14 +12201,12 @@ func TestChatGoalPersistence(t *testing.T) {
 		org := dbgen.Organization(t, store, database.Organization{})
 		dbgen.OrganizationMember(t, store, database.OrganizationMember{UserID: owner.ID, OrganizationID: org.ID})
 
-		_, err := store.InsertChatProvider(ctx, database.InsertChatProviderParams{
-			Provider:             "openai",
-			DisplayName:          "OpenAI",
-			APIKey:               "test-key",
-			Enabled:              true,
-			CentralApiKeyEnabled: true,
+		dbgen.ChatProvider(t, store, database.ChatProvider{
+			Provider:    "openai",
+			DisplayName: "OpenAI",
+			APIKey:      "test-key",
+			Enabled:     true,
 		})
-		require.NoError(t, err)
 
 		modelCfg, err := store.InsertChatModelConfig(ctx, database.InsertChatModelConfigParams{
 			Provider:             "openai",
