@@ -17121,6 +17121,9 @@ const docTemplate = `{
                 "role": {
                     "$ref": "#/definitions/codersdk.ChatMessageRole"
                 },
+                "sent_as_goal": {
+                    "type": "boolean"
+                },
                 "usage": {
                     "$ref": "#/definitions/codersdk.ChatMessageUsage"
                 }
