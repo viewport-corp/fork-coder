@@ -2189,6 +2189,14 @@ export const ChatGoalStatuses: ChatGoalStatus[] = [
 ];
 
 // From codersdk/chats.go
+/**
+ * ChatGoalsEnabledResponse is the response for getting the chat goals setting.
+ */
+export interface ChatGoalsEnabledResponse {
+	readonly enabled: boolean;
+}
+
+// From codersdk/chats.go
 export interface ChatGroup extends Group {
 	readonly role: ChatRole;
 }
@@ -8756,6 +8764,14 @@ export interface UpdateChatDebugRetentionDaysRequest {
  */
 export interface UpdateChatDesktopEnabledRequest {
 	readonly enable_desktop: boolean;
+}
+
+// From codersdk/chats.go
+/**
+ * UpdateChatGoalsEnabledRequest is the request to update the chat goals setting.
+ */
+export interface UpdateChatGoalsEnabledRequest {
+	readonly enabled: boolean;
 }
 
 // From codersdk/chats.go

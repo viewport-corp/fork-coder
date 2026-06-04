@@ -50,7 +50,7 @@ type completeGoalResult struct {
 func GetGoal(db database.Store, options GoalToolOptions) fantasy.AgentTool {
 	return fantasy.NewAgentTool(
 		GetGoalToolName,
-		"Inspect the current durable goal for this root chat. Returns null when no active or paused goal exists.",
+		"Inspect the current durable goal for this root chat. Returns null when no current goal exists.",
 		func(ctx context.Context, _ getGoalArgs, _ fantasy.ToolCall) (fantasy.ToolResponse, error) {
 			goal, err := db.GetCurrentChatGoalByRootChatID(ctx, options.RootChatID)
 			if err != nil {

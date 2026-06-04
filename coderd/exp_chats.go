@@ -496,16 +496,6 @@ func (api *API) getChatDiffStatusesByChatID(
 	return statusesByChatID, nil
 }
 
-func chatRootID(chat database.Chat) uuid.UUID {
-	if chat.RootChatID.Valid {
-		return chat.RootChatID.UUID
-	}
-	if chat.ParentChatID.Valid {
-		return chat.ParentChatID.UUID
-	}
-	return chat.ID
-}
-
 func sdkChatRootID(chat codersdk.Chat) uuid.UUID {
 	if chat.RootChatID != nil {
 		return *chat.RootChatID
@@ -517,6 +507,14 @@ func sdkChatRootID(chat codersdk.Chat) uuid.UUID {
 }
 
 func (api *API) hydrateChatGoals(ctx context.Context, chats []codersdk.Chat) error {
+	enabled, err := api.chatGoalsEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+
 	rootIDs := map[uuid.UUID]struct{}{}
 	var collectRootIDs func([]codersdk.Chat)
 	collectRootIDs = func(values []codersdk.Chat) {
@@ -565,6 +563,36 @@ func chatGoalResponse(goal *database.ChatGoal) codersdk.ChatGoalResponse {
 	}
 	sdkGoal := db2sdk.ChatGoal(*goal)
 	return codersdk.ChatGoalResponse{Goal: &sdkGoal}
+}
+
+func (api *API) chatGoalsEnabled(ctx context.Context) (bool, error) {
+	enabled, err := api.Database.GetChatGoalsEnabled(ctx)
+	if err != nil {
+		return false, xerrors.Errorf("get chat goals setting: %w", err)
+	}
+	return enabled, nil
+}
+
+func writeChatGoalsDisabled(ctx context.Context, rw http.ResponseWriter) {
+	httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+		Message: "Chat goals are not enabled.",
+	})
+}
+
+func (api *API) requireChatGoalsEnabled(ctx context.Context, rw http.ResponseWriter) bool {
+	enabled, err := api.chatGoalsEnabled(ctx)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to load chat goals setting.",
+			Detail:  err.Error(),
+		})
+		return false
+	}
+	if !enabled {
+		writeChatGoalsDisabled(ctx, rw)
+		return false
+	}
+	return true
 }
 
 func writeChatGoalMutationError(ctx context.Context, rw http.ResponseWriter, err error) bool {
@@ -1153,6 +1181,10 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 
 	var req codersdk.CreateChatRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
+		return
+	}
+
+	if req.GoalMutation != nil && !api.requireChatGoalsEnabled(ctx, rw) {
 		return
 	}
 
@@ -2234,7 +2266,11 @@ func (api *API) chatGoal(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chat := httpmw.ChatParam(r)
 
-	goal, err := api.Database.GetCurrentChatGoalByRootChatID(ctx, chatRootID(chat))
+	if !api.requireChatGoalsEnabled(ctx, rw) {
+		return
+	}
+
+	goal, err := api.Database.GetCurrentChatGoalByRootChatID(ctx, chat.RootID())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			httpapi.Write(ctx, rw, http.StatusOK, codersdk.ChatGoalResponse{})
@@ -2280,6 +2316,10 @@ func (api *API) patchChatGoal(rw http.ResponseWriter, r *http.Request) {
 		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
 			Message: "Only the chat owner may update goals.",
 		})
+		return
+	}
+
+	if !api.requireChatGoalsEnabled(ctx, rw) {
 		return
 	}
 
@@ -2417,13 +2457,24 @@ func (api *API) getChatMessages(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sentAsGoalIDs, err := chatGoalMessageIDs(ctx, api.Database, messages)
+	var sentAsGoalIDs map[int64]struct{}
+	chatGoalsEnabled, err := api.chatGoalsEnabled(ctx)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-			Message: "Failed to get chat goal message markers.",
+			Message: "Failed to load chat goals setting.",
 			Detail:  err.Error(),
 		})
 		return
+	}
+	if chatGoalsEnabled {
+		sentAsGoalIDs, err = chatGoalMessageIDs(ctx, api.Database, messages)
+		if err != nil {
+			httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+				Message: "Failed to get chat goal message markers.",
+				Detail:  err.Error(),
+			})
+			return
+		}
 	}
 
 	httpapi.Write(ctx, rw, http.StatusOK, codersdk.ChatMessagesResponse{
@@ -3271,6 +3322,10 @@ func (api *API) postChatMessages(rw http.ResponseWriter, r *http.Request) {
 
 	var req codersdk.CreateChatMessageRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
+		return
+	}
+
+	if req.GoalMutation != nil && !api.requireChatGoalsEnabled(ctx, rw) {
 		return
 	}
 
@@ -5374,6 +5429,46 @@ func (api *API) putChatDesktopEnabled(rw http.ResponseWriter, r *http.Request) {
 	} else if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
 			Message: "Internal error updating desktop setting.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	rw.WriteHeader(http.StatusNoContent)
+}
+
+// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+//
+//nolint:revive // get-return: revive assumes get* must be a getter, but this is an HTTP handler.
+func (api *API) getChatGoalsEnabled(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	enabled, err := api.Database.GetChatGoalsEnabled(ctx)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Internal error fetching chat goals setting.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	httpapi.Write(ctx, rw, http.StatusOK, codersdk.ChatGoalsEnabledResponse{
+		Enabled: enabled,
+	})
+}
+
+// EXPERIMENTAL: this endpoint is experimental and is subject to change.
+func (api *API) putChatGoalsEnabled(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if !api.Authorize(r, policy.ActionUpdate, rbac.ResourceDeploymentConfig) {
+		httpapi.Forbidden(rw)
+		return
+	}
+
+	var req codersdk.UpdateChatGoalsEnabledRequest
+	if !httpapi.Read(ctx, rw, r, &req) {
+		return
+	}
+	if err := api.Database.UpsertChatGoalsEnabled(ctx, req.Enabled); err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Internal error updating chat goals setting.",
 			Detail:  err.Error(),
 		})
 		return

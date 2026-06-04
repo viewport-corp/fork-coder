@@ -174,6 +174,7 @@ interface ChatPageInputProps {
 	agentSetupNotice?: ReactNode;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
+	showPursueGoal?: boolean;
 	canPursueGoal?: boolean;
 	isModelCatalogLoading?: boolean;
 	// Imperative editor handle plus the one-time initial draft,
@@ -240,7 +241,8 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 	agentSetupNotice,
 	planModeEnabled,
 	onPlanModeToggle,
-	canPursueGoal = true,
+	showPursueGoal = false,
+	canPursueGoal = false,
 	isModelCatalogLoading = false,
 	inputRef,
 	initialValue,
@@ -471,6 +473,7 @@ export const ChatPageInput: FC<ChatPageInputProps> = ({
 			modelSelectorPlaceholder={modelSelectorPlaceholder}
 			planModeEnabled={planModeEnabled}
 			onPlanModeToggle={onPlanModeToggle}
+			showPursueGoal={showPursueGoal}
 			canPursueGoal={canPursueGoal}
 			isModelCatalogLoading={isModelCatalogLoading}
 			workspaceOptions={workspaceOptions}

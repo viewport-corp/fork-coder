@@ -1264,6 +1264,8 @@ func New(options *Options) *API {
 				r.Put("/user-personal-model-overrides/{context}", api.putUserChatPersonalModelOverride)
 				r.Get("/desktop-enabled", api.getChatDesktopEnabled)
 				r.Put("/desktop-enabled", api.putChatDesktopEnabled)
+				r.Get("/goals", api.getChatGoalsEnabled)
+				r.Put("/goals", api.putChatGoalsEnabled)
 				r.Get("/computer-use-provider", api.getChatComputerUseProvider)
 				r.Put("/computer-use-provider", api.putChatComputerUseProvider)
 				r.Get("/debug-logging", api.getChatDebugLogging)

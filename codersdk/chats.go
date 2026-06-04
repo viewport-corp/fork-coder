@@ -863,6 +863,16 @@ type UpdateChatDesktopEnabledRequest struct {
 	EnableDesktop bool `json:"enable_desktop"`
 }
 
+// ChatGoalsEnabledResponse is the response for getting the chat goals setting.
+type ChatGoalsEnabledResponse struct {
+	Enabled bool `json:"enabled"`
+}
+
+// UpdateChatGoalsEnabledRequest is the request to update the chat goals setting.
+type UpdateChatGoalsEnabledRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
 // AdvisorConfig is the deployment-wide runtime configuration for the
 // experimental chat advisor.
 //
@@ -2647,6 +2657,33 @@ func (c *ExperimentalClient) UpdateChatDesktopEnabled(ctx context.Context, req U
 	return nil
 }
 
+// GetChatGoalsEnabled returns the deployment-wide chat goals setting.
+func (c *ExperimentalClient) GetChatGoalsEnabled(ctx context.Context) (ChatGoalsEnabledResponse, error) {
+	res, err := c.Request(ctx, http.MethodGet, "/api/experimental/chats/config/goals", nil)
+	if err != nil {
+		return ChatGoalsEnabledResponse{}, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ChatGoalsEnabledResponse{}, ReadBodyAsError(res)
+	}
+	var resp ChatGoalsEnabledResponse
+	return resp, json.NewDecoder(res.Body).Decode(&resp)
+}
+
+// UpdateChatGoalsEnabled updates the deployment-wide chat goals setting.
+func (c *ExperimentalClient) UpdateChatGoalsEnabled(ctx context.Context, req UpdateChatGoalsEnabledRequest) error {
+	res, err := c.Request(ctx, http.MethodPut, "/api/experimental/chats/config/goals", req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		return ReadBodyAsError(res)
+	}
+	return nil
+}
+
 // GetChatAdvisorConfig returns the deployment-wide advisor configuration.
 func (c *ExperimentalClient) GetChatAdvisorConfig(ctx context.Context) (AdvisorConfig, error) {
 	res, err := c.Request(ctx, http.MethodGet, "/api/experimental/chats/config/advisor", nil)
@@ -3150,7 +3187,7 @@ func (c *ExperimentalClient) GetChat(ctx context.Context, chatID uuid.UUID) (Cha
 	return chat, json.NewDecoder(res.Body).Decode(&chat)
 }
 
-// GetChatGoal returns the current active or paused goal for a chat's root.
+// GetChatGoal returns the current durable goal for a chat's root.
 func (c *ExperimentalClient) GetChatGoal(ctx context.Context, chatID uuid.UUID) (ChatGoalResponse, error) {
 	res, err := c.Request(ctx, http.MethodGet, fmt.Sprintf("/api/experimental/chats/%s/goal", chatID), nil)
 	if err != nil {

@@ -216,6 +216,8 @@ export const PursueGoalModeSendsGoalMutation: Story = {
 		onSend: fn().mockResolvedValue(undefined),
 		initialValue: "  stabilize the release  ",
 		onPlanModeToggle: fn(),
+		showPursueGoal: true,
+		canPursueGoal: true,
 	},
 	play: async ({ canvasElement, args }) => {
 		const canvas = within(canvasElement);
@@ -633,6 +635,8 @@ export const AttachmentsOnlyPursueGoalBlocksSend: Story = {
 			onRemoveAttachment: fn(),
 			onSend: fn(),
 			initialValue: "",
+			showPursueGoal: true,
+			canPursueGoal: true,
 		};
 	})(),
 	play: async ({ canvasElement, args }) => {

@@ -284,6 +284,74 @@ func insertAssistantCostMessage(
 	})
 }
 
+func TestChatGoalsRequireExperiment(t *testing.T) {
+	t.Parallel()
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	client, _ := newChatClientWithDatabase(t)
+	firstUser := coderdtest.CreateFirstUser(t, client.Client)
+	createChatModelConfig(t, client)
+
+	setting, err := client.GetChatGoalsEnabled(ctx)
+	require.NoError(t, err)
+	require.False(t, setting.Enabled)
+
+	chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
+		OrganizationID: firstUser.OrganizationID,
+		Content: []codersdk.ChatInputPart{{
+			Type: codersdk.ChatInputPartTypeText,
+			Text: "start without a goal",
+		}},
+	})
+	require.NoError(t, err)
+	require.Nil(t, chat.Goal)
+
+	_, err = client.GetChatGoal(ctx, chat.ID)
+	sdkErr := requireSDKError(t, err, http.StatusForbidden)
+	require.Contains(t, sdkErr.Message, "Chat goals are not enabled")
+
+	goalID := uuid.New()
+	_, err = client.UpdateChatGoal(ctx, chat.ID, codersdk.ChatGoalMutation{
+		Action: codersdk.ChatGoalMutationActionPause,
+		GoalID: &goalID,
+	})
+	sdkErr = requireSDKError(t, err, http.StatusForbidden)
+	require.Contains(t, sdkErr.Message, "Chat goals are not enabled")
+
+	_, err = client.CreateChat(ctx, codersdk.CreateChatRequest{
+		OrganizationID: firstUser.OrganizationID,
+		Content: []codersdk.ChatInputPart{{
+			Type: codersdk.ChatInputPartTypeText,
+			Text: "start with a disabled goal",
+		}},
+		GoalMutation: &codersdk.ChatGoalMutation{
+			Action:    codersdk.ChatGoalMutationActionSet,
+			Objective: "disabled objective",
+		},
+	})
+	sdkErr = requireSDKError(t, err, http.StatusForbidden)
+	require.Contains(t, sdkErr.Message, "Chat goals are not enabled")
+
+	require.NoError(t, client.UpdateChatGoalsEnabled(ctx, codersdk.UpdateChatGoalsEnabledRequest{Enabled: true}))
+	setting, err = client.GetChatGoalsEnabled(ctx)
+	require.NoError(t, err)
+	require.True(t, setting.Enabled)
+
+	enabledChat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
+		OrganizationID: firstUser.OrganizationID,
+		Content: []codersdk.ChatInputPart{{
+			Type: codersdk.ChatInputPartTypeText,
+			Text: "start with an enabled goal",
+		}},
+		GoalMutation: &codersdk.ChatGoalMutation{
+			Action:    codersdk.ChatGoalMutationActionSet,
+			Objective: "enabled objective",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, enabledChat.Goal)
+}
+
 func TestChatGoalAPI(t *testing.T) {
 	t.Parallel()
 
@@ -291,6 +359,8 @@ func TestChatGoalAPI(t *testing.T) {
 	client, db := newChatClientWithDatabase(t)
 	firstUser := coderdtest.CreateFirstUser(t, client.Client)
 	createChatModelConfig(t, client)
+
+	require.NoError(t, client.UpdateChatGoalsEnabled(ctx, codersdk.UpdateChatGoalsEnabledRequest{Enabled: true}))
 
 	chat, err := client.CreateChat(ctx, codersdk.CreateChatRequest{
 		OrganizationID: firstUser.OrganizationID,
@@ -420,6 +490,8 @@ func TestPatchChatGoalRequiresOwnerForSharedSiteOwner(t *testing.T) {
 	ownerClient, db := newChatClientWithDatabase(t)
 	firstUser := coderdtest.CreateFirstUser(t, ownerClient.Client)
 	createChatModelConfig(t, ownerClient)
+
+	require.NoError(t, ownerClient.UpdateChatGoalsEnabled(ctx, codersdk.UpdateChatGoalsEnabledRequest{Enabled: true}))
 
 	sharedOwnerRaw, sharedOwner := coderdtest.CreateAnotherUser(
 		t,

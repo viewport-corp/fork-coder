@@ -3596,6 +3596,20 @@ class ExperimentalApiMethods {
 		await this.axios.put("/api/experimental/chats/config/desktop-enabled", req);
 	};
 
+	getChatGoalsEnabled =
+		async (): Promise<TypesGen.ChatGoalsEnabledResponse> => {
+			const response = await this.axios.get<TypesGen.ChatGoalsEnabledResponse>(
+				"/api/experimental/chats/config/goals",
+			);
+			return response.data;
+		};
+
+	updateChatGoalsEnabled = async (
+		req: TypesGen.UpdateChatGoalsEnabledRequest,
+	): Promise<void> => {
+		await this.axios.put("/api/experimental/chats/config/goals", req);
+	};
+
 	getChatAdvisorConfig = async (): Promise<AdvisorConfig> => {
 		const response = await this.axios.get<AdvisorConfig>(
 			"/api/experimental/chats/config/advisor",

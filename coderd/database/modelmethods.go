@@ -212,6 +212,16 @@ func (c Chat) IsSubChat() bool {
 	return c.RootChatID.Valid || c.ParentChatID.Valid
 }
 
+func (c Chat) RootID() uuid.UUID {
+	if c.RootChatID.Valid {
+		return c.RootChatID.UUID
+	}
+	if c.ParentChatID.Valid {
+		return c.ParentChatID.UUID
+	}
+	return c.ID
+}
+
 func (r GetChatsRow) RBACObject() rbac.Object {
 	return r.Chat.RBACObject()
 }

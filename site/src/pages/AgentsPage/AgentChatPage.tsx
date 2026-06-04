@@ -24,6 +24,7 @@ import { buildOptimisticEditedMessage } from "#/api/queries/chatMessageEdits";
 import {
 	chat,
 	chatDesktopEnabled,
+	chatGoalsEnabled,
 	chatKey,
 	chatMessagesForInfiniteScroll,
 	chatModelConfigs,
@@ -818,6 +819,7 @@ const AgentChatPage: FC = () => {
 	const userThresholdsQuery = useQuery(userCompactionThresholds());
 	const preferencesQuery = useQuery(preferenceSettings());
 	const desktopEnabledQuery = useQuery(chatDesktopEnabled());
+	const chatGoalsEnabledQuery = useQuery(chatGoalsEnabled());
 	const userDebugLoggingQuery = useQuery(userChatDebugLogging());
 	const mcpServersQuery = useQuery(mcpServerConfigs());
 	const workspacesQuery = useQuery(workspaces({ q: "owner:me", limit: 0 }));
@@ -827,6 +829,7 @@ const AgentChatPage: FC = () => {
 		currentUser.id,
 	);
 	const desktopEnabled = desktopEnabledQuery.data?.enable_desktop ?? false;
+	const areChatGoalsEnabled = chatGoalsEnabledQuery.data?.enabled ?? false;
 	const debugLoggingEnabled =
 		userDebugLoggingQuery.data?.debug_logging_enabled ?? false;
 
@@ -1233,7 +1236,7 @@ const AgentChatPage: FC = () => {
 	const isInputDisabled =
 		!hasModelOptions || isArchived || isChatSettingsPending || isViewerNotOwner;
 	const canUpdateChatWorkspace = !isArchived && !isViewerNotOwner;
-	const canMutateGoal = isRootChat && !isViewerNotOwner;
+	const canMutateGoal = areChatGoalsEnabled && isRootChat && !isViewerNotOwner;
 	const isGoalActionDisabled = isArchived || isViewerNotOwner;
 	const selectedWorkspaceId = chatQuery.data?.workspace_id ?? null;
 
@@ -1253,7 +1256,7 @@ const AgentChatPage: FC = () => {
 	};
 
 	const handleGoalAction = async (
-		action: Exclude<TypesGen.ChatGoalMutationAction, "set">,
+		action: ChatGoalAction,
 		completionSummary?: string,
 	) => {
 		if (!canMutateGoal) {
@@ -1273,6 +1276,8 @@ const AgentChatPage: FC = () => {
 			onPausedRunningGoal: () => {
 				toast.info("Goal paused. Use Stop to halt the current turn.");
 			},
+		}).catch((error: unknown) => {
+			toast.error(getErrorMessage(error, "Failed to update goal."));
 		});
 	};
 
@@ -1758,7 +1763,8 @@ const AgentChatPage: FC = () => {
 			gitWatcher={gitWatcher}
 			sshCommand={sshCommand}
 			handleCommit={handleCommit}
-			goal={chatQuery.data?.goal}
+			goal={areChatGoalsEnabled ? chatQuery.data?.goal : undefined}
+			showPursueGoal={areChatGoalsEnabled}
 			canMutateGoal={canMutateGoal}
 			isGoalActionPending={isUpdateChatGoalPending}
 			isGoalActionDisabled={isGoalActionDisabled}

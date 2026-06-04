@@ -3141,6 +3141,17 @@ func (q *querier) GetChatGoalMessageIDsByMessageIDs(ctx context.Context, message
 	return q.db.GetChatGoalMessageIDsByMessageIDs(ctx, messageIDs)
 }
 
+func (q *querier) GetChatGoalsEnabled(ctx context.Context) (bool, error) {
+	// The chat-goals flag is a deployment-wide setting read by any
+	// authenticated chat user and by chatd when deciding whether to expose
+	// goal prompt context and tools. We only require an explicit actor so
+	// unauthenticated calls fail closed.
+	if _, ok := ActorFromContext(ctx); !ok {
+		return false, ErrNoActor
+	}
+	return q.db.GetChatGoalsEnabled(ctx)
+}
+
 func (q *querier) GetChatIncludeDefaultSystemPrompt(ctx context.Context) (bool, error) {
 	// The include-default-system-prompt flag is a deployment-wide setting read
 	// during chat creation by every authenticated user, so no RBAC policy
@@ -8313,6 +8324,13 @@ func (q *querier) UpsertChatGeneralModelOverride(ctx context.Context, value stri
 		return err
 	}
 	return q.db.UpsertChatGeneralModelOverride(ctx, value)
+}
+
+func (q *querier) UpsertChatGoalsEnabled(ctx context.Context, enabled bool) error {
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceDeploymentConfig); err != nil {
+		return err
+	}
+	return q.db.UpsertChatGoalsEnabled(ctx, enabled)
 }
 
 func (q *querier) UpsertChatIncludeDefaultSystemPrompt(ctx context.Context, includeDefaultSystemPrompt bool) error {

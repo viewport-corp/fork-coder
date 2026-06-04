@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { getErrorMessage } from "#/api/errors";
 import {
+	chatGoalsEnabled,
 	chatModelConfigs,
 	chatModels,
 	chatProviderConfigs,
@@ -52,6 +53,7 @@ const AgentCreatePage: FC = () => {
 	const preferencesQuery = useQuery(preferenceSettings());
 	const mcpServersQuery = useQuery(mcpServerConfigs());
 	const workspacesQuery = useQuery(workspaces({ q: "owner:me", limit: 0 }));
+	const chatGoalsEnabledQuery = useQuery(chatGoalsEnabled());
 	const createMutation = useMutation(createChat(queryClient));
 	const webPush = useWebpushNotifications();
 	const [chimeEnabled, setChimeEnabledState] = useState(getChimeEnabled);
@@ -188,6 +190,7 @@ const AgentCreatePage: FC = () => {
 				isModelCatalogLoading={chatModelsQuery.isLoading}
 				isModelConfigsLoading={chatModelConfigsQuery.isLoading}
 				rootPersonalModelOverride={rootPersonalModelOverride}
+				showPursueGoal={chatGoalsEnabledQuery.data?.enabled ?? false}
 				isPersonalModelOverridesLoading={personalModelOverridesQuery.isLoading}
 				mcpServers={mcpServersQuery.data ?? []}
 				onMCPAuthComplete={() => void mcpServersQuery.refetch()}

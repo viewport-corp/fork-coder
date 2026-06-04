@@ -1624,16 +1624,6 @@ func isRootChat(chat database.Chat) bool {
 	return !chat.ParentChatID.Valid
 }
 
-func chatRootID(chat database.Chat) uuid.UUID {
-	if chat.RootChatID.Valid {
-		return chat.RootChatID.UUID
-	}
-	if chat.ParentChatID.Valid {
-		return chat.ParentChatID.UUID
-	}
-	return chat.ID
-}
-
 func currentChatGoal(ctx context.Context, db database.Store, rootChatID uuid.UUID) (*database.ChatGoal, error) {
 	goal, err := db.GetCurrentChatGoalByRootChatID(ctx, rootChatID)
 	if err != nil {
@@ -7637,9 +7627,20 @@ func (p *Server) runChat(
 		}
 		return nil
 	})
+	chatGoalsEnabled := false
 	var currentGoal *database.ChatGoal
 	g.Go(func() error {
-		goal, err := currentChatGoal(ctx, p.db, chatRootID(chat))
+		//nolint:gocritic // AsChatd provides narrowly-scoped daemon access for reading deployment config.
+		enabled, err := p.db.GetChatGoalsEnabled(dbauthz.AsChatd(ctx))
+		if err != nil {
+			logger.Warn(ctx, "failed to load chat goals setting", slog.Error(err))
+			return nil
+		}
+		if !enabled {
+			return nil
+		}
+		chatGoalsEnabled = true
+		goal, err := currentChatGoal(ctx, p.db, chat.RootID())
 		if err != nil {
 			return err
 		}
@@ -8032,7 +8033,7 @@ func (p *Server) runChat(
 	}
 	initialResolvedSkills := resolvedSkillsFor(workspaceSkills)
 	injectedSkillIndex := chattool.FormatResolvedSkillIndex(initialResolvedSkills)
-	canCompleteGoal := isRootChat && currentGoal != nil && !isPlanModeTurn && !isExploreSubagent
+	canCompleteGoal := chatGoalsEnabled && isRootChat && currentGoal != nil && !isPlanModeTurn && !isExploreSubagent
 	prompt = buildSystemPrompt(
 		prompt,
 		subagentInstruction,
@@ -8435,20 +8436,22 @@ func (p *Server) runChat(
 			GetWorkspaceConn: workspaceCtx.getWorkspaceConn,
 		}),
 	}
-	tools = append(tools, chattool.GetGoal(p.db, chattool.GoalToolOptions{
-		ChatID:     chat.ID,
-		RootChatID: chatRootID(chat),
-		IsRootChat: isRootChat,
-	}))
-	if canCompleteGoal {
-		tools = append(tools, chattool.CompleteGoal(p.db, chattool.GoalToolOptions{
+	if chatGoalsEnabled {
+		tools = append(tools, chattool.GetGoal(p.db, chattool.GoalToolOptions{
 			ChatID:     chat.ID,
-			RootChatID: chatRootID(chat),
-			IsRootChat: true,
-			OnGoalUpdated: func(_ context.Context, updatedChat database.Chat, goal database.ChatGoal) {
-				p.publishChatGoalChange(updatedChat, &goal)
-			},
+			RootChatID: chat.RootID(),
+			IsRootChat: isRootChat,
 		}))
+		if canCompleteGoal {
+			tools = append(tools, chattool.CompleteGoal(p.db, chattool.GoalToolOptions{
+				ChatID:     chat.ID,
+				RootChatID: chat.RootID(),
+				IsRootChat: true,
+				OnGoalUpdated: func(_ context.Context, updatedChat database.Chat, goal database.ChatGoal) {
+					p.publishChatGoalChange(updatedChat, &goal)
+				},
+			}))
+		}
 	}
 	if allowAskUserQuestion {
 		tools = append(tools, chattool.NewAskUserQuestionTool())
@@ -8787,12 +8790,16 @@ func (p *Server) runChat(
 			reloadedResolvedSkills := resolvedSkillsFor(reloadedSkills)
 			injectedSkillIndex = chattool.FormatResolvedSkillIndex(reloadedResolvedSkills)
 			reloadUserPrompt := p.resolveUserPrompt(reloadCtx, chat.OwnerID)
-			reloadActiveGoal, err := currentChatGoal(reloadCtx, p.db, chatRootID(chat))
-			if err != nil {
-				return nil, err
-			}
-			if reloadActiveGoal != nil && reloadActiveGoal.Status != database.ChatGoalStatusActive {
-				reloadActiveGoal = nil
+			var reloadActiveGoal *database.ChatGoal
+			if chatGoalsEnabled {
+				var err error
+				reloadActiveGoal, err = currentChatGoal(reloadCtx, p.db, chat.RootID())
+				if err != nil {
+					return nil, err
+				}
+				if reloadActiveGoal != nil && reloadActiveGoal.Status != database.ChatGoalStatusActive {
+					reloadActiveGoal = nil
+				}
 			}
 			reloadedPrompt = buildSystemPrompt(
 				reloadedPrompt,

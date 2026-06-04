@@ -162,6 +162,7 @@ interface AgentChatPageViewProps {
 
 	// Goal state and handlers.
 	goal?: TypesGen.ChatGoal;
+	showPursueGoal?: boolean;
 	canMutateGoal?: boolean;
 	isGoalActionPending?: boolean;
 	isGoalActionDisabled?: boolean;
@@ -252,7 +253,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	sshCommand,
 	handleCommit,
 	goal,
-	canMutateGoal = true,
+	showPursueGoal = false,
+	canMutateGoal = false,
 	isGoalActionPending = false,
 	isGoalActionDisabled = false,
 	onGoalAction = () => {},
@@ -606,6 +608,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								agentSetupNotice={agentSetupNotice}
 								planModeEnabled={planModeEnabled}
 								onPlanModeToggle={onPlanModeToggle}
+								showPursueGoal={showPursueGoal}
 								canPursueGoal={canMutateGoal && !isGoalActionDisabled}
 								isModelCatalogLoading={isModelCatalogLoading}
 								workspaceOptions={workspaceOptions}

@@ -141,6 +141,7 @@ interface AgentCreateFormProps {
 	modelConfigs: readonly TypesGen.ChatModelConfig[];
 	isModelConfigsLoading: boolean;
 	rootPersonalModelOverride?: TypesGen.ChatPersonalModelOverride;
+	showPursueGoal?: boolean;
 	isPersonalModelOverridesLoading?: boolean;
 	mcpServers?: readonly TypesGen.MCPServerConfig[];
 	onMCPAuthComplete?: (serverId: string) => void;
@@ -163,6 +164,7 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 	isModelCatalogLoading,
 	isModelConfigsLoading,
 	rootPersonalModelOverride,
+	showPursueGoal = false,
 	isPersonalModelOverridesLoading = false,
 	mcpServers,
 	onMCPAuthComplete,
@@ -538,6 +540,8 @@ export const AgentCreateForm: FC<AgentCreateFormProps> = ({
 						isModelCatalogLoading={isModelCatalogLoading}
 						hasModelOptions={hasModelOptions}
 						planModeEnabled={planModeEnabled}
+						showPursueGoal={showPursueGoal}
+						canPursueGoal={showPursueGoal}
 						onPlanModeToggle={setPlanModeEnabled}
 						attachments={attachments}
 						onAttach={handleAttach}

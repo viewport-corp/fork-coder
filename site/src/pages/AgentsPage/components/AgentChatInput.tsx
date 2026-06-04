@@ -129,6 +129,7 @@ interface AgentChatInputProps {
 	hasModelOptions: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
+	showPursueGoal?: boolean;
 	canPursueGoal?: boolean;
 	isModelCatalogLoading?: boolean;
 	// Streaming controls (optional, for the detail page).
@@ -354,7 +355,8 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 	hasModelOptions,
 	planModeEnabled = false,
 	onPlanModeToggle,
-	canPursueGoal = true,
+	showPursueGoal = false,
+	canPursueGoal = false,
 	isModelCatalogLoading = false,
 	isStreaming = false,
 	onInterrupt,
@@ -592,6 +594,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 		handleMcpToggle(serverId, false);
 
 	const isGoalModeUnavailable =
+		!showPursueGoal ||
 		!canPursueGoal ||
 		editingQueuedMessageID !== null ||
 		isEditingHistoryMessage;
@@ -1301,20 +1304,22 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 												)}
 											</button>
 										)}
-										<button
-											type="button"
-											role="menuitemcheckbox"
-											aria-checked={pursueGoalEnabled}
-											onClick={handleGoalModeToggle}
-											disabled={isDisabled || isGoalModeUnavailable}
-											className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
-										>
-											<TargetIcon className="size-3.5 shrink-0" />
-											<span>Pursue goal</span>
-											{pursueGoalEnabled && (
-												<CheckIcon className="ml-auto size-icon-sm shrink-0" />
-											)}
-										</button>
+										{showPursueGoal && (
+											<button
+												type="button"
+												role="menuitemcheckbox"
+												aria-checked={pursueGoalEnabled}
+												onClick={handleGoalModeToggle}
+												disabled={isDisabled || isGoalModeUnavailable}
+												className="group flex h-8 w-full cursor-pointer items-center gap-1.5 border-none bg-transparent px-1 text-xs text-content-secondary shadow-none transition-colors hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												<TargetIcon className="size-3.5 shrink-0" />
+												<span>Pursue goal</span>
+												{pursueGoalEnabled && (
+													<CheckIcon className="ml-auto size-icon-sm shrink-0" />
+												)}
+											</button>
+										)}
 										{workspaceOptions &&
 											onWorkspaceChange &&
 											(isBelowMdViewport() ? (

@@ -376,6 +376,9 @@ type sqlcQuerier interface {
 	GetChatFilesByIDs(ctx context.Context, ids []uuid.UUID) ([]ChatFile, error)
 	GetChatGeneralModelOverride(ctx context.Context) (string, error)
 	GetChatGoalMessageIDsByMessageIDs(ctx context.Context, messageIds []int64) ([]int64, error)
+	// GetChatGoalsEnabled returns whether the chat goals experiment is enabled.
+	// It defaults to false when unset.
+	GetChatGoalsEnabled(ctx context.Context) (bool, error)
 	// GetChatIncludeDefaultSystemPrompt preserves the legacy default
 	// for deployments created before the explicit include-default toggle.
 	// When the toggle is unset, a non-empty custom prompt implies false;
@@ -1394,6 +1397,8 @@ type sqlcQuerier interface {
 	UpsertChatDiffStatusReference(ctx context.Context, arg UpsertChatDiffStatusReferenceParams) (ChatDiffStatus, error)
 	UpsertChatExploreModelOverride(ctx context.Context, value string) error
 	UpsertChatGeneralModelOverride(ctx context.Context, value string) error
+	// UpsertChatGoalsEnabled updates whether the chat goals experiment is enabled.
+	UpsertChatGoalsEnabled(ctx context.Context, enabled bool) error
 	UpsertChatIncludeDefaultSystemPrompt(ctx context.Context, includeDefaultSystemPrompt bool) error
 	// UpsertChatPersonalModelOverridesEnabled updates whether users may configure
 	// personal chat model overrides.

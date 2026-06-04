@@ -51,7 +51,7 @@ const GOAL_ACTION_UI = {
 
 export const ChatGoalBanner: FC<ChatGoalBannerProps> = ({
 	goal,
-	canMutateGoal = true,
+	canMutateGoal = false,
 	isActionPending = false,
 	isActionDisabled = false,
 	onAction,
@@ -112,9 +112,7 @@ export const ChatGoalBanner: FC<ChatGoalBannerProps> = ({
 								variant={action === "clear" ? "subtle" : "outline"}
 								disabled={disabled}
 								onClick={() => {
-									void (async () => {
-										await onAction(action);
-									})().catch(() => undefined);
+									void onAction(action);
 								}}
 							>
 								<Icon />

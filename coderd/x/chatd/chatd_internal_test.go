@@ -71,6 +71,10 @@ func (t *testAgentTool) SetProviderOptions(opts fantasy.ProviderOptions) {
 
 func expectNoCurrentGoal(db *dbmock.MockStore, rootChatID uuid.UUID) {
 	db.EXPECT().
+		GetChatGoalsEnabled(gomock.Any()).
+		Return(true, nil).
+		AnyTimes()
+	db.EXPECT().
 		GetCurrentChatGoalByRootChatID(gomock.Any(), rootChatID).
 		Return(database.ChatGoal{}, sql.ErrNoRows).
 		AnyTimes()

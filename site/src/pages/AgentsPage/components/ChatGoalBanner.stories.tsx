@@ -25,6 +25,7 @@ const meta: Meta<typeof ChatGoalBanner> = {
 	args: {
 		goal: goal(),
 		onAction: fn(),
+		canMutateGoal: true,
 	},
 };
 

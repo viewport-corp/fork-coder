@@ -177,6 +177,7 @@ export const PursueGoalCreatesGoal: Story = {
 	args: {
 		...defaultArgs,
 		onCreateChat: fn().mockResolvedValue(undefined),
+		showPursueGoal: true,
 		modelConfigs: defaultModelConfigs,
 	},
 	play: async ({ canvasElement, args }) => {
