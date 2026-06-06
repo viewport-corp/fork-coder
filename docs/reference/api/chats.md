@@ -17,10 +17,10 @@ Experimental: this endpoint is subject to change.
 
 ### Parameters
 
-| Name    | In    | Type   | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|---------|-------|--------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `q`     | query | string | false    | Search query. Supports title:<substring> (case-insensitive, quote multi-word values), archived:bool, has_unread:bool, pr_status:<draft\|open\|merged\|closed> as repeated or comma-separated values, diff_url:<url> (quote values containing colons), pr:<number> (exact PR number match), repo:<owner/repo> (case-insensitive substring match against git remote origin or URL), pr_title:<text> (case-insensitive PR title substring). Bare terms are not supported; use title:<value> for title filtering. |
-| `label` | query | string | false    | Filter by label as key:value. Repeat for multiple (AND logic).                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Name    | In    | Type   | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|---------|-------|--------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `q`     | query | string | false    | Search query. Supports title:<substring> (case-insensitive, quote multi-word values), archived:bool, has_unread:bool, pr_status:<draft\|open\|merged\|closed> as repeated or comma-separated values, source:<created_by_me\|shared_with_me\|all>, diff_url:<url> (quote values containing colons), pr:<number> (exact PR number match), repo:<owner/repo> (case-insensitive substring match against git remote origin or URL), pr_title:<text> (case-insensitive PR title substring). Bare terms are not supported; use title:<value> for title filtering. |
+| `label` | query | string | false    | Filter by label as key:value. Repeat for multiple (AND logic).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ### Example responses
 
@@ -175,6 +175,7 @@ Experimental: this endpoint is subject to change.
     "pin_order": 0,
     "plan_mode": "plan",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+    "shared": true,
     "status": "waiting",
     "title": "string",
     "updated_at": "2019-08-24T14:15:22Z",
@@ -315,6 +316,7 @@ Status Code **200**
 | `» pin_order`                     | integer                                                                | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `» plan_mode`                     | [codersdk.ChatPlanMode](schemas.md#codersdkchatplanmode)               | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `» root_chat_id`                  | string(uuid)                                                           | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `» shared`                        | boolean                                                                | false    |              | Shared is true when this chat's root chat has explicit user or group ACL entries.                                                                                                                                                                                                                                                                                                                          |
 | `» status`                        | [codersdk.ChatStatus](schemas.md#codersdkchatstatus)                   | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `» title`                         | string                                                                 | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `» updated_at`                    | string(date-time)                                                      | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -323,13 +325,13 @@ Status Code **200**
 
 #### Enumerated Values
 
-| Property      | Value(s)                                                                                                                                 |
-|---------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `client_type` | `api`, `ui`                                                                                                                              |
-| `status`      | `active`, `cleared`, `complete`, `completed`, `error`, `paused`, `pending`, `replaced`, `requires_action`, `running`, `waiting`          |
-| `kind`        | `auth`, `config`, `generic`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `startup_timeout`, `timeout`, `usage_limit` |
-| `type`        | `context-file`, `file`, `file-reference`, `reasoning`, `skill`, `source`, `text`, `tool-call`, `tool-result`                             |
-| `plan_mode`   | `plan`                                                                                                                                   |
+| Property      | Value(s)                                                                                                                                        |
+|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client_type` | `api`, `ui`                                                                                                                                     |
+| `status`      | `active`, `cleared`, `complete`, `completed`, `error`, `paused`, `pending`, `replaced`, `requires_action`, `running`, `waiting`                 |
+| `kind`        | `auth`, `config`, `generic`, `missing_key`, `overloaded`, `provider_disabled`, `rate_limit`, `stream_silence_timeout`, `timeout`, `usage_limit` |
+| `type`        | `context-file`, `file`, `file-reference`, `reasoning`, `skill`, `source`, `text`, `tool-call`, `tool-result`                                    |
+| `plan_mode`   | `plan`                                                                                                                                          |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
 
@@ -556,6 +558,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "shared": true,
       "status": "waiting",
       "title": "string",
       "updated_at": "2019-08-24T14:15:22Z",
@@ -705,6 +708,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "shared": true,
   "status": "waiting",
   "title": "string",
   "updated_at": "2019-08-24T14:15:22Z",
@@ -1005,6 +1009,7 @@ Experimental: this endpoint is subject to change.
     "pin_order": 0,
     "plan_mode": "plan",
     "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+    "shared": true,
     "status": "waiting",
     "title": "string",
     "updated_at": "2019-08-24T14:15:22Z",
@@ -1208,6 +1213,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "shared": true,
       "status": "waiting",
       "title": "string",
       "updated_at": "2019-08-24T14:15:22Z",
@@ -1357,6 +1363,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "shared": true,
   "status": "waiting",
   "title": "string",
   "updated_at": "2019-08-24T14:15:22Z",
@@ -1641,6 +1648,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "shared": true,
       "status": "waiting",
       "title": "string",
       "updated_at": "2019-08-24T14:15:22Z",
@@ -1790,6 +1798,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "shared": true,
   "status": "waiting",
   "title": "string",
   "updated_at": "2019-08-24T14:15:22Z",
@@ -2987,6 +2996,7 @@ Experimental: this endpoint is subject to change.
       "pin_order": 0,
       "plan_mode": "plan",
       "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+      "shared": true,
       "status": "waiting",
       "title": "string",
       "updated_at": "2019-08-24T14:15:22Z",
@@ -3136,6 +3146,7 @@ Experimental: this endpoint is subject to change.
   "pin_order": 0,
   "plan_mode": "plan",
   "root_chat_id": "2898031c-fdce-4e3e-8c53-4481dd42fcd7",
+  "shared": true,
   "status": "waiting",
   "title": "string",
   "updated_at": "2019-08-24T14:15:22Z",
