@@ -9941,6 +9941,12 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
                 "log_path": "string",
                 "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+                "order_dependencies": [
+                  {
+                    "requires": "success",
+                    "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+                  }
+                ],
                 "run_on_start": true,
                 "run_on_stop": true,
                 "script": "string",
@@ -11293,6 +11299,12 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
                 "log_path": "string",
                 "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+                "order_dependencies": [
+                  {
+                    "requires": "success",
+                    "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+                  }
+                ],
                 "run_on_start": true,
                 "run_on_stop": true,
                 "script": "string",
@@ -14523,6 +14535,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                 "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
                 "log_path": "string",
                 "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+                "order_dependencies": [
+                  {
+                    "requires": "success",
+                    "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+                  }
+                ],
                 "run_on_start": true,
                 "run_on_stop": true,
                 "script": "string",
@@ -14808,6 +14826,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
       "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
       "log_path": "string",
       "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+      "order_dependencies": [
+        {
+          "requires": "success",
+          "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+        }
+      ],
       "run_on_start": true,
       "run_on_stop": true,
       "script": "string",
@@ -15380,6 +15404,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
   "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
   "log_path": "string",
   "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+  "order_dependencies": [
+    {
+      "requires": "success",
+      "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+    }
+  ],
   "run_on_start": true,
   "run_on_stop": true,
   "script": "string",
@@ -15391,20 +15421,57 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 ### Properties
 
-| Name                 | Type                                                                       | Required | Restrictions | Description |
-|----------------------|----------------------------------------------------------------------------|----------|--------------|-------------|
-| `cron`               | string                                                                     | false    |              |             |
-| `display_name`       | string                                                                     | false    |              |             |
-| `exit_code`          | integer                                                                    | false    |              |             |
-| `id`                 | string                                                                     | false    |              |             |
-| `log_path`           | string                                                                     | false    |              |             |
-| `log_source_id`      | string                                                                     | false    |              |             |
-| `run_on_start`       | boolean                                                                    | false    |              |             |
-| `run_on_stop`        | boolean                                                                    | false    |              |             |
-| `script`             | string                                                                     | false    |              |             |
-| `start_blocks_login` | boolean                                                                    | false    |              |             |
-| `status`             | [codersdk.WorkspaceAgentScriptStatus](#codersdkworkspaceagentscriptstatus) | false    |              |             |
-| `timeout`            | integer                                                                    | false    |              |             |
+| Name                 | Type                                                                                                  | Required | Restrictions | Description                                                                                                                                                                   |
+|----------------------|-------------------------------------------------------------------------------------------------------|----------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `cron`               | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `display_name`       | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `exit_code`          | integer                                                                                               | false    |              |                                                                                                                                                                               |
+| `id`                 | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `log_path`           | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `log_source_id`      | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `order_dependencies` | array of [codersdk.WorkspaceAgentScriptOrderDependency](#codersdkworkspaceagentscriptorderdependency) | false    |              | Order dependencies lists scripts on the same agent that must reach a terminal state before this script starts. Resolved from coder_script_order data sources in the template. |
+| `run_on_start`       | boolean                                                                                               | false    |              |                                                                                                                                                                               |
+| `run_on_stop`        | boolean                                                                                               | false    |              |                                                                                                                                                                               |
+| `script`             | string                                                                                                | false    |              |                                                                                                                                                                               |
+| `start_blocks_login` | boolean                                                                                               | false    |              |                                                                                                                                                                               |
+| `status`             | [codersdk.WorkspaceAgentScriptStatus](#codersdkworkspaceagentscriptstatus)                            | false    |              |                                                                                                                                                                               |
+| `timeout`            | integer                                                                                               | false    |              |                                                                                                                                                                               |
+
+## codersdk.WorkspaceAgentScriptOrderDependency
+
+```json
+{
+  "requires": "success",
+  "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+}
+```
+
+### Properties
+
+| Name        | Type                                                                                     | Required | Restrictions | Description |
+|-------------|------------------------------------------------------------------------------------------|----------|--------------|-------------|
+| `requires`  | [codersdk.WorkspaceAgentScriptOrderRequires](#codersdkworkspaceagentscriptorderrequires) | false    |              |             |
+| `script_id` | string                                                                                   | false    |              |             |
+
+#### Enumerated Values
+
+| Property   | Value(s)                |
+|------------|-------------------------|
+| `requires` | `completion`, `success` |
+
+## codersdk.WorkspaceAgentScriptOrderRequires
+
+```json
+"success"
+```
+
+### Properties
+
+#### Enumerated Values
+
+| Value(s)                |
+|-------------------------|
+| `completion`, `success` |
 
 ## codersdk.WorkspaceAgentScriptStatus
 
@@ -15416,9 +15483,9 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 #### Enumerated Values
 
-| Value(s)                                             |
-|------------------------------------------------------|
-| `exit_failure`, `ok`, `pipes_left_open`, `timed_out` |
+| Value(s)                                                        |
+|-----------------------------------------------------------------|
+| `exit_failure`, `ok`, `pipes_left_open`, `skipped`, `timed_out` |
 
 ## codersdk.WorkspaceAgentStartupScriptBehavior
 
@@ -15768,6 +15835,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
               "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
               "log_path": "string",
               "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+              "order_dependencies": [
+                {
+                  "requires": "success",
+                  "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+                }
+              ],
               "run_on_start": true,
               "run_on_stop": true,
               "script": "string",
@@ -16238,6 +16311,12 @@ If the schedule is empty, the user will be updated to use the default schedule.|
           "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
           "log_path": "string",
           "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+          "order_dependencies": [
+            {
+              "requires": "success",
+              "script_id": "74e7d8c3-daa9-40c1-ac0e-b64bfab79c57"
+            }
+          ],
           "run_on_start": true,
           "run_on_stop": true,
           "script": "string",
@@ -16588,6 +16667,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
                     "log_path": "string",
                     "log_source_id": "4197ab25-95cf-4b91-9c78-f7f2af5d353a",
+                    "order_dependencies": [],
                     "run_on_start": true,
                     "run_on_stop": true,
                     "script": "string",
