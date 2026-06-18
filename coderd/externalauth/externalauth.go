@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -52,6 +53,11 @@ const (
 	// transient refresh failure across all attempts.
 	defaultRefreshRetryTimeout = 10 * time.Second
 )
+
+type refreshResult struct {
+	link database.ExternalAuthLink
+	err  error
+}
 
 // Config is used for authentication for Git operations.
 type Config struct {
@@ -142,7 +148,22 @@ type Config struct {
 	// defaultRefreshRetryTimeout. A negative value disables transient-failure
 	// retries entirely, so exactly one refresh attempt is made.
 	RefreshRetryTimeout time.Duration
+
+	// TestSubscribeChannel can be used in tests to wait for all callers to
+	// subscribe to a refresh.
+	TestSubscribeChannel chan string
 }
+
+var (
+	// mu protects refreshers and subscribers.
+	mu sync.Mutex
+
+	// refreshers records if there is a caller already refreshing the token.
+	refreshers = make(map[string]struct{})
+
+	// subscribers allows parallel callers to wait on the same refresh request.
+	subscribers = make(map[string][]chan refreshResult)
+)
 
 // Git returns a Provider for this config if the provider type is a
 // supported git hosting provider. Returns (nil, nil) for non-git
@@ -190,6 +211,43 @@ func IsInvalidTokenError(err error) bool {
 
 // RefreshToken automatically refreshes the token if expired and permitted.
 func (c *Config) RefreshToken(ctx context.Context, db database.Store, externalAuthLink database.ExternalAuthLink) (database.ExternalAuthLink, error) {
+	// Prevent parallel refreshes by waiting for the result of any already
+	// in-flight refresh.  Otherwise, the parallel calls will fail with a bad
+	// refresh token as it was already used.
+	mu.Lock()
+	key := externalAuthLink.OAuthAccessToken
+	if _, ok := refreshers[key]; ok {
+		ch := make(chan refreshResult, 1)
+		subscribers[key] = append(subscribers[key], ch)
+		if c.TestSubscribeChannel != nil {
+			c.TestSubscribeChannel <- key
+		}
+		mu.Unlock()
+		results := <-ch
+		return results.link, results.err
+	}
+	refreshers[key] = struct{}{}
+	mu.Unlock()
+
+	link, err := c.refreshToken(ctx, db, externalAuthLink)
+
+	// Let all subscribers know the results.
+	mu.Lock()
+	for _, sub := range subscribers[key] {
+		sub <- refreshResult{
+			link: link,
+			err:  err,
+		}
+	}
+	delete(refreshers, key)
+	delete(subscribers, key)
+	mu.Unlock()
+
+	return link, err
+}
+
+// RefreshToken automatically refreshes the token if expired and permitted.
+func (c *Config) refreshToken(ctx context.Context, db database.Store, externalAuthLink database.ExternalAuthLink) (database.ExternalAuthLink, error) {
 	// If the token is expired and refresh is disabled, we prompt
 	// the user to authenticate again.
 	if c.NoRefresh &&
@@ -236,24 +294,6 @@ func (c *Config) RefreshToken(ctx context.Context, db database.Store, externalAu
 		//
 		// The error message is saved for debugging purposes.
 		if isFailedRefresh(existingToken, err) {
-			// Before caching the failure, re-read the external auth link
-			// from the database. A concurrent request may have already
-			// refreshed the token successfully, consuming the single-use
-			// refresh token (e.g., GitHub App tokens). In that case our
-			// "bad_refresh_token" error is a false positive from losing
-			// the race, and we should use the winner's updated token
-			// instead of poisoning the database with a cached failure.
-			currentLink, readErr := db.GetExternalAuthLink(ctx, database.GetExternalAuthLinkParams{
-				ProviderID: externalAuthLink.ProviderID,
-				UserID:     externalAuthLink.UserID,
-			})
-			if readErr == nil && currentLink.OAuthRefreshToken != externalAuthLink.OAuthRefreshToken {
-				// Another caller won the refresh race and stored a new
-				// refresh token. Return their updated link instead of
-				// caching a failure.
-				return currentLink, nil
-			}
-
 			reason := err.Error()
 			if len(reason) > failureReasonLimit {
 				// Limit the length of the error message to prevent

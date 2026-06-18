@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/coderd"
@@ -213,9 +214,7 @@ func TestRefreshToken(t *testing.T) {
 		}
 
 		// Try again with a bad refresh token error. This will invalidate the
-		// refresh token, and not retry again. Expect DB calls to check for
-		// concurrent refresh (GetExternalAuthLink) and then remove the refresh token.
-		mDB.EXPECT().GetExternalAuthLink(gomock.Any(), gomock.Any()).Return(link, nil).Times(1)
+		// refresh token, and not retry again.
 		mDB.EXPECT().UpdateExternalAuthLinkRefreshToken(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 		refreshErr = &oauth2.RetrieveError{ // github error
 			Response: &http.Response{
@@ -317,11 +316,7 @@ func TestRefreshToken(t *testing.T) {
 			},
 		})
 
-		// The race-detection re-read returns the same refresh token so it
-		// does not look like a concurrent winner. The cached-failure write
-		// then proceeds. Each runs exactly once for a single refresh attempt.
-		mDB.EXPECT().GetExternalAuthLink(gomock.Any(), gomock.Any()).
-			Return(link, nil).Times(1)
+		// It should clear the refresh token from the DB.
 		mDB.EXPECT().UpdateExternalAuthLinkRefreshToken(gomock.Any(), gomock.Any()).
 			Return(nil).Times(1)
 
@@ -348,9 +343,28 @@ func TestRefreshToken(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mDB := dbmock.NewMockStore(ctrl)
 
+		parallelRequests := 5
+		subscribeCh := make(chan string)
+
+		// The first call to refresh well succeed and all others will fail, but the
+		// second call will return before the first call.
+		var refreshCalls atomic.Int64
 		fake, config, link := setupOauth2Test(t, testConfig{
 			FakeIDPOpts: []oidctest.FakeIDPOpt{
 				oidctest.WithRefresh(func(_ string) error {
+					if refreshCalls.Add(1) <= 1 {
+						// Wait for all the other calls to be subscribed, to prevent
+						// the test from flaking.
+						subscribed := 0
+						for {
+							<-subscribeCh
+							subscribed = subscribed + 1
+							if subscribed >= parallelRequests-1 {
+								return nil
+							}
+						}
+					}
+					// This should never actually get called.
 					return &oauth2.RetrieveError{
 						Response: &http.Response{
 							StatusCode: http.StatusOK,
@@ -359,31 +373,46 @@ func TestRefreshToken(t *testing.T) {
 					}
 				}),
 			},
-			ExternalAuthOpt: func(cfg *externalauth.Config) {},
+			ExternalAuthOpt: func(cfg *externalauth.Config) {
+				cfg.TestSubscribeChannel = subscribeCh
+			},
 		})
 
 		ctx := oidc.ClientContext(context.Background(), fake.HTTPClient(nil))
 		link.OAuthExpiry = time.Now().Add(time.Hour * -1)
 
-		// Simulate a concurrent winner: when the loser re-reads the
-		// DB, the refresh token has changed (the winner stored a new
-		// one). The loser should return the updated link instead of
-		// caching the failure.
 		winnerLink := link
 		winnerLink.OAuthRefreshToken = "winner-refresh-token"
 		winnerLink.OAuthAccessToken = "winner-access-token"
-		mDB.EXPECT().GetExternalAuthLink(gomock.Any(), database.GetExternalAuthLinkParams{
-			ProviderID: link.ProviderID,
-			UserID:     link.UserID,
-		}).Return(winnerLink, nil).Times(1)
 
-		// UpdateExternalAuthLinkRefreshToken should NOT be called
-		// because the re-read detected the concurrent refresh.
+		// The single winning call will update the link.
+		mDB.EXPECT().UpdateExternalAuthLink(gomock.Any(), gomock.Cond(func(params database.UpdateExternalAuthLinkParams) bool {
+			return params.ProviderID == link.ProviderID && params.UserID == link.UserID
+		})).Return(winnerLink, nil).Times(1)
 
-		result, err := config.RefreshToken(ctx, mDB, link)
-		require.NoError(t, err, "loser should succeed using the winner's token")
-		require.Equal(t, "winner-access-token", result.OAuthAccessToken)
-		require.Equal(t, "winner-refresh-token", result.OAuthRefreshToken)
+		// When we fire off all requests in parallel...
+		var eg errgroup.Group
+		results := make([]database.ExternalAuthLink, parallelRequests)
+		for i := range parallelRequests {
+			eg.Go(func() error {
+				result, err := config.RefreshToken(ctx, mDB, link)
+				results[i] = result
+				return err
+			})
+		}
+
+		// No call should error.
+		err := eg.Wait()
+		require.NoError(t, err)
+
+		// All calls should have picked up the winning token.
+		for i := range parallelRequests {
+			require.Equal(t, "winner-access-token", results[i].OAuthAccessToken)
+			require.Equal(t, "winner-refresh-token", results[i].OAuthRefreshToken)
+		}
+
+		// Only one refresh call should have actually been made.
+		require.Equal(t, int64(1), refreshCalls.Load())
 	})
 
 	// ValidateFailure tests if the token is no longer valid with a 401 response.
