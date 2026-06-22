@@ -72,9 +72,15 @@ func FetchNATSCA(ctx context.Context, db database.Store) (*NATSCA, error) {
 
 	// No active CA exists. Create one inside a transaction under an advisory
 	// lock, re-checking after the lock is acquired so that concurrent callers
-	// insert exactly one row. This mirrors rotator.rotateKeys.
+	// insert exactly one row. We reuse the rotator's lock
+	// (LockIDCryptoKeyRotation) rather than a dedicated one so that this
+	// bootstrap path and the rotator are always serialized against each
+	// other on the (feature, sequence) primary key. Today the server starts
+	// the rotator only after this fetch returns, so they never actually
+	// overlap; sharing the lock keeps that safe even if a future caller
+	// invokes FetchNATSCA concurrently with the rotator.
 	err = db.InTx(func(tx database.Store) error {
-		err := tx.AcquireLock(ctx, database.LockIDNATSCACreate)
+		err := tx.AcquireLock(ctx, database.LockIDCryptoKeyRotation)
 		if err != nil {
 			return xerrors.Errorf("acquire lock: %w", err)
 		}

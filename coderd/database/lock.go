@@ -16,7 +16,6 @@ const (
 	LockIDReconcileSystemRoles
 	LockIDBoundaryUsageStats
 	LockIDAIProvidersEnvSeed
-	LockIDNATSCACreate
 )
 
 // GenLockID generates a unique and consistent lock ID from a given string.
