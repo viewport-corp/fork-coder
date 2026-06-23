@@ -1,8 +1,14 @@
 package cryptokeys
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/pem"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -53,11 +59,89 @@ func TestCASecretRoundTrip(t *testing.T) {
 func TestParseCASecretErrors(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := parseCASecret("")
-	require.ErrorContains(t, err, "no certificate")
+	now := time.Now()
+	secretA, err := generateCASecret(now, DefaultKeyDuration)
+	require.NoError(t, err)
+	secretB, err := generateCASecret(now, DefaultKeyDuration)
+	require.NoError(t, err)
 
-	_, _, err = parseCASecret("not pem at all")
-	require.ErrorContains(t, err, "no certificate")
+	certA, keyA := splitCAPEM(t, secretA)
+	_, keyB := splitCAPEM(t, secretB)
+
+	nonCACert, nonCAKey := generateNonCAPEM(t, now)
+
+	cases := []struct {
+		name    string
+		secret  string
+		errText string
+	}{
+		{"Empty", "", "no certificate"},
+		{"NotPEM", "not pem at all", "no certificate"},
+		{"CertOnly", string(certA), "no private key"},
+		{"KeyCertMismatch", string(certA) + string(keyB), "does not match certificate"},
+		{"MultipleCertificates", string(certA) + string(certA) + string(keyA), "multiple certificates"},
+		{"MultiplePrivateKeys", string(certA) + string(keyA) + string(keyA), "multiple private keys"},
+		{"UnexpectedBlockType", string(pemBlock("RSA PRIVATE KEY", []byte("x"))), "unexpected PEM block type"},
+		{"BadCertificateBytes", string(pemBlock(caCertPEMBlockType, []byte("garbage"))), "parse certificate"},
+		{"BadPrivateKeyBytes", string(certA) + string(pemBlock(caKeyPEMBlockType, []byte("garbage"))), "parse private key"},
+		{"NotASigningCA", string(nonCACert) + string(nonCAKey), "not a valid signing CA"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, _, err := parseCASecret(tc.secret)
+			require.ErrorContains(t, err, tc.errText)
+		})
+	}
+}
+
+// splitCAPEM splits a CA secret bundle into its certificate and private key
+// PEM blocks so tests can recombine them into malformed bundles.
+func splitCAPEM(t *testing.T, secret string) (certPEM, keyPEM []byte) {
+	t.Helper()
+	rest := []byte(secret)
+	for {
+		block, r := pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		rest = r
+		switch block.Type {
+		case caCertPEMBlockType:
+			certPEM = pem.EncodeToMemory(block)
+		case caKeyPEMBlockType:
+			keyPEM = pem.EncodeToMemory(block)
+		}
+	}
+	require.NotNil(t, certPEM)
+	require.NotNil(t, keyPEM)
+	return certPEM, keyPEM
+}
+
+func pemBlock(blockType string, der []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der})
+}
+
+// generateNonCAPEM produces a structurally valid cert+key bundle whose
+// certificate is not a CA (no IsCA, no KeyUsageCertSign). The key matches the
+// cert, so it passes every parseCASecret check except the signing-CA check.
+func generateNonCAPEM(t *testing.T, now time.Time) (certPEM, keyPEM []byte) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "not-a-ca"},
+		NotBefore:    now.Add(-time.Hour),
+		NotAfter:     now.Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
+	require.NoError(t, err)
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	require.NoError(t, err)
+	return pemBlock(caCertPEMBlockType, der), pemBlock(caKeyPEMBlockType, keyDER)
 }
 
 func TestFetchOrCreateInitialNATSCA(t *testing.T) {
@@ -179,7 +263,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 		})
 		// A rotated-in key that hasn't started yet must not be the active
 		// signer, but its cert belongs in the trust bundle.
-		_ = dbgen.CryptoKey(t, db, database.CryptoKey{
+		future := dbgen.CryptoKey(t, db, database.CryptoKey{
 			Feature:  database.CryptoKeyFeatureNatsCa,
 			Sequence: 2,
 			StartsAt: now.Add(time.Hour),
@@ -188,6 +272,17 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, current.Sequence, ca.Sequence)
+
+		currentCert, _, err := parseCASecret(current.Secret.String)
+		require.NoError(t, err)
+		futureCert, _, err := parseCASecret(future.Secret.String)
+		require.NoError(t, err)
+
+		require.Equal(t, currentCert.Raw, ca.Cert.Raw)
 		require.Len(t, ca.TrustBundle, 2)
+		bundle := [][]byte{ca.TrustBundle[0].Raw, ca.TrustBundle[1].Raw}
+		require.Contains(t, bundle, currentCert.Raw)
+		require.Contains(t, bundle, futureCert.Raw)
+		require.NotEqual(t, currentCert.Raw, futureCert.Raw)
 	})
 }
