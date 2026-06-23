@@ -34,8 +34,8 @@ const (
 // NATS cluster mTLS.
 //
 // Callers that need to react to CA rotation (re-minting leaves and reloading
-// the NATS server config) should poll FetchNATSCA and compare Sequence to
-// detect when the active CA has changed.
+// the NATS server config) should poll FetchOrCreateInitialNATSCA and compare
+// Sequence to detect when the active CA has changed.
 type NATSCA struct {
 	// Sequence is the crypto_keys sequence of the active row.
 	Sequence int32
@@ -50,16 +50,24 @@ type NATSCA struct {
 	TrustBundle []*x509.Certificate
 }
 
-// FetchNATSCA returns the current NATS cluster CA, creating it if no valid CA
-// exists. The NATS pubsub is constructed before the key rotator starts, so on
-// fresh deployments the CA row will not exist at first fetch; creation here is
-// guarded by an advisory lock and is idempotent under concurrent callers.
-// After creation the rotator owns the key's lifecycle.
+// FetchOrCreateInitialNATSCA returns the current NATS cluster CA, creating the
+// initial CA if no valid one exists. The NATS pubsub is constructed before the
+// key rotator starts, so on fresh deployments the CA row will not exist at
+// first fetch; this function bootstraps it under an advisory lock so the
+// rotator has a CA to take over.
+//
+// Ordering constraint: the FIRST call (the one that creates the CA) must run to
+// completion before starting the key rotator (cryptokeys.StartRotator). The
+// bootstrap insert is only collision-free with respect to the rotator under
+// that ordering; see the lock comment below. In production the server satisfies
+// this by fetching the CA before calling StartRotator. Once a CA exists this
+// function is a read-only fast path, so later callers (e.g. polling for
+// rotation) may run concurrently with the rotator safely.
 //
 // keyDuration sizes the bootstrap certificate's validity window and must match
 // the rotator's key duration (database.DefaultKeyDuration in production) so the
 // bootstrap CA and rotator-minted CAs have consistent lifetimes.
-func FetchNATSCA(ctx context.Context, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
+func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
 	//nolint:gocritic // The CA accessor requires the same crypto key access as the rotator.
 	ctx = dbauthz.AsKeyRotator(ctx)
 
@@ -78,15 +86,19 @@ func FetchNATSCA(ctx context.Context, db database.Store, keyDuration time.Durati
 		return ca, nil
 	}
 
-	// No active CA exists. Create one inside a transaction under an advisory
-	// lock, re-checking after the lock is acquired so that concurrent callers
-	// insert exactly one row. We reuse the rotator's lock
-	// (LockIDCryptoKeyRotation) rather than a dedicated one so that this
-	// bootstrap path and the rotator are always serialized against each
-	// other on the (feature, sequence) primary key. Today the server starts
-	// the rotator only after this fetch returns, so they never actually
-	// overlap; sharing the lock keeps that safe even if a future caller
-	// invokes FetchNATSCA concurrently with the rotator.
+	// No active CA exists, so create one under the rotator's advisory lock
+	// (LockIDCryptoKeyRotation). The lock plus a read-committed re-check after
+	// acquiring it keeps this startup path collision-free: it either inserts
+	// the first nats_ca row or sees a row a peer (or the rotator) already
+	// committed.
+	//
+	// This does NOT make the rotator itself collision-proof against this path.
+	// The rotator reads under Repeatable Read with a snapshot fixed when it
+	// acquires the lock, so a row committed here while it waits is invisible to
+	// it and its insert would hit a unique violation (which self-heals on its
+	// next cycle). We rely on the ordering constraint documented above
+	// (bootstrap completes before StartRotator) so the two never actually
+	// contend; the shared lock protects the startup path, not the rotator.
 	err = db.InTx(func(tx database.Store) error {
 		err := tx.AcquireLock(ctx, database.LockIDCryptoKeyRotation)
 		if err != nil {

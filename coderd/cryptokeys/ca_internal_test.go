@@ -60,7 +60,7 @@ func TestParseCASecretErrors(t *testing.T) {
 	require.ErrorContains(t, err, "no certificate")
 }
 
-func TestFetchNATSCA(t *testing.T) {
+func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 	t.Parallel()
 
 	t.Run("CreatesWhenMissing", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestFetchNATSCA(t *testing.T) {
 		db, _ := dbtestutil.NewDB(t)
 		ctx := testutil.Context(t, testutil.WaitShort)
 
-		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.NotNil(t, ca.Cert)
 		require.NotNil(t, ca.Key)
@@ -77,7 +77,7 @@ func TestFetchNATSCA(t *testing.T) {
 		require.Equal(t, ca.Cert, ca.TrustBundle[0])
 
 		// A second fetch returns the same CA without inserting another row.
-		again, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
+		again, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, ca.Sequence, again.Sequence)
 		require.Equal(t, ca.Cert.Raw, again.Cert.Raw)
@@ -101,7 +101,7 @@ func TestFetchNATSCA(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				cas[i], errs[i] = FetchNATSCA(ctx, db, DefaultKeyDuration)
+				cas[i], errs[i] = FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
 			}()
 		}
 		wg.Wait()
@@ -145,7 +145,7 @@ func TestFetchNATSCA(t *testing.T) {
 			DeletesAt: sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		})
 
-		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, newKey.Sequence, ca.Sequence)
 
@@ -184,7 +184,7 @@ func TestFetchNATSCA(t *testing.T) {
 			StartsAt: now.Add(time.Hour),
 		})
 
-		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, current.Sequence, ca.Sequence)
 		require.Len(t, ca.TrustBundle, 2)
