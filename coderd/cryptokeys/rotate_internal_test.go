@@ -140,7 +140,7 @@ func Test_rotateKeys(t *testing.T) {
 
 		// The old CA must remain a valid trust root for the maximum leaf
 		// lifetime after rotation.
-		expectedDeletesAt := oldKey.ExpiresAt(keyDuration).Add(NATSCATokenDuration + time.Hour)
+		expectedDeletesAt := oldKey.ExpiresAt(keyDuration).Add(NATSCALeafValidity + time.Hour)
 		oldKey, err = db.GetCryptoKeyByFeatureAndSequence(ctx, database.GetCryptoKeyByFeatureAndSequenceParams{
 			Feature:  oldKey.Feature,
 			Sequence: oldKey.Sequence,

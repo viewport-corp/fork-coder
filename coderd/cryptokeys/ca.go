@@ -23,6 +23,10 @@ import (
 const (
 	caCertPEMBlockType = "CERTIFICATE"
 	caKeyPEMBlockType  = "EC PRIVATE KEY"
+
+	// clockSkewTolerance backdates the CA certificate's NotBefore and extends
+	// its NotAfter so that replicas with mildly skewed clocks still accept it.
+	clockSkewTolerance = time.Hour
 )
 
 // NATSCA is the parsed state of the nats_ca crypto key feature at one point in
@@ -51,7 +55,11 @@ type NATSCA struct {
 // fresh deployments the CA row will not exist at first fetch; creation here is
 // guarded by an advisory lock and is idempotent under concurrent callers.
 // After creation the rotator owns the key's lifecycle.
-func FetchNATSCA(ctx context.Context, db database.Store) (*NATSCA, error) {
+//
+// keyDuration sizes the bootstrap certificate's validity window and must match
+// the rotator's key duration (database.DefaultKeyDuration in production) so the
+// bootstrap CA and rotator-minted CAs have consistent lifetimes.
+func FetchNATSCA(ctx context.Context, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
 	//nolint:gocritic // The CA accessor requires the same crypto key access as the rotator.
 	ctx = dbauthz.AsKeyRotator(ctx)
 
@@ -103,7 +111,7 @@ func FetchNATSCA(ctx context.Context, db database.Store) (*NATSCA, error) {
 			return nil
 		}
 
-		secret, err := generateCASecret(now)
+		secret, err := generateCASecret(now, keyDuration)
 		if err != nil {
 			return xerrors.Errorf("generate CA secret: %w", err)
 		}
@@ -182,11 +190,12 @@ func parseNATSCAKeys(keys []database.CryptoKey, now time.Time) (*NATSCA, bool, e
 // for signing NATS cluster leaf certificates, PEM-encoded into a single
 // bundle for storage in the crypto_keys secret column.
 //
-// The certificate outlives the key row on purpose: a row is rotated after
-// DefaultKeyDuration but remains a valid trust root until its deletes_at
-// (an hour plus NATSCATokenDuration after rotation), and leaves minted just
-// before rotation live for up to NATSCATokenDuration.
-func generateCASecret(now time.Time) (string, error) {
+// anchorTime is the key row's starts_at (which may be in the future for a
+// rotated-in key). keyDuration is the rotator's key duration: the row stays the
+// active signer for that long. The certificate must outlive that window plus
+// the longest leaf it could sign (NATSCALeafValidity) plus clock-skew slack, so
+// leaves minted just before rotation still chain to a valid CA.
+func generateCASecret(anchorTime time.Time, keyDuration time.Duration) (string, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return "", xerrors.Errorf("generate key: %w", err)
@@ -203,9 +212,8 @@ func generateCASecret(now time.Time) (string, error) {
 		Subject: pkix.Name{
 			CommonName: "coder-nats-ca",
 		},
-		// Backdate NotBefore to tolerate clock skew between replicas.
-		NotBefore:             now.Add(-time.Hour),
-		NotAfter:              now.Add(DefaultKeyDuration + NATSCATokenDuration + time.Hour),
+		NotBefore:             anchorTime.Add(-clockSkewTolerance),
+		NotAfter:              anchorTime.Add(keyDuration + NATSCALeafValidity + clockSkewTolerance),
 		KeyUsage:              x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

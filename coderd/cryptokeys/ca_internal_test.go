@@ -18,26 +18,36 @@ import (
 func TestCASecretRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now().UTC().Truncate(time.Second)
-	secret, err := generateCASecret(now)
-	require.NoError(t, err)
+	// The certificate's NotAfter must track the supplied keyDuration, not a
+	// hardcoded default, so a CA stays valid for as long as it can be the
+	// active signer plus the longest leaf it signs.
+	for _, keyDuration := range []time.Duration{DefaultKeyDuration, DefaultKeyDuration * 3, time.Hour} {
+		now := time.Now().UTC().Truncate(time.Second)
+		secret, err := generateCASecret(now, keyDuration)
+		require.NoError(t, err)
 
-	cert, signer, err := parseCASecret(secret)
-	require.NoError(t, err)
+		cert, signer, err := parseCASecret(secret)
+		require.NoError(t, err)
 
-	require.True(t, cert.IsCA)
-	require.True(t, cert.BasicConstraintsValid)
-	require.True(t, cert.MaxPathLenZero)
-	require.Equal(t, x509.KeyUsageCertSign, cert.KeyUsage)
-	require.Equal(t, now.Add(-time.Hour), cert.NotBefore)
-	require.Equal(t, now.Add(DefaultKeyDuration+NATSCATokenDuration+time.Hour), cert.NotAfter)
-	require.Equal(t, cert.PublicKey, signer.Public())
+		require.True(t, cert.IsCA)
+		require.True(t, cert.BasicConstraintsValid)
+		require.True(t, cert.MaxPathLenZero)
+		require.Equal(t, x509.KeyUsageCertSign, cert.KeyUsage)
+		require.Equal(t, now.Add(-clockSkewTolerance), cert.NotBefore)
+		require.Equal(t, now.Add(keyDuration+NATSCALeafValidity+clockSkewTolerance), cert.NotAfter)
+		require.Equal(t, cert.PublicKey, signer.Public())
 
-	// The cert must be able to verify itself as a trust root.
-	pool := x509.NewCertPool()
-	pool.AddCert(cert)
-	_, err = cert.Verify(x509.VerifyOptions{Roots: pool})
-	require.NoError(t, err)
+		// The cert must outlive its active-signer window so leaves signed at
+		// the end of that window still chain to a valid CA.
+		require.True(t, cert.NotAfter.After(now.Add(keyDuration)),
+			"cert must remain valid past the end of its active-signer window")
+
+		// The cert must be able to verify itself as a trust root.
+		pool := x509.NewCertPool()
+		pool.AddCert(cert)
+		_, err = cert.Verify(x509.VerifyOptions{Roots: pool})
+		require.NoError(t, err)
+	}
 }
 
 func TestParseCASecretErrors(t *testing.T) {
@@ -59,7 +69,7 @@ func TestFetchNATSCA(t *testing.T) {
 		db, _ := dbtestutil.NewDB(t)
 		ctx := testutil.Context(t, testutil.WaitShort)
 
-		ca, err := FetchNATSCA(ctx, db)
+		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.NotNil(t, ca.Cert)
 		require.NotNil(t, ca.Key)
@@ -67,7 +77,7 @@ func TestFetchNATSCA(t *testing.T) {
 		require.Equal(t, ca.Cert, ca.TrustBundle[0])
 
 		// A second fetch returns the same CA without inserting another row.
-		again, err := FetchNATSCA(ctx, db)
+		again, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, ca.Sequence, again.Sequence)
 		require.Equal(t, ca.Cert.Raw, again.Cert.Raw)
@@ -91,7 +101,7 @@ func TestFetchNATSCA(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				cas[i], errs[i] = FetchNATSCA(ctx, db)
+				cas[i], errs[i] = FetchNATSCA(ctx, db, DefaultKeyDuration)
 			}()
 		}
 		wg.Wait()
@@ -135,7 +145,7 @@ func TestFetchNATSCA(t *testing.T) {
 			DeletesAt: sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		})
 
-		ca, err := FetchNATSCA(ctx, db)
+		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, newKey.Sequence, ca.Sequence)
 
@@ -174,7 +184,7 @@ func TestFetchNATSCA(t *testing.T) {
 			StartsAt: now.Add(time.Hour),
 		})
 
-		ca, err := FetchNATSCA(ctx, db)
+		ca, err := FetchNATSCA(ctx, db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, current.Sequence, ca.Sequence)
 		require.Len(t, ca.TrustBundle, 2)
