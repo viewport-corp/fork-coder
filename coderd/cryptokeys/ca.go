@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/dbtime"
@@ -67,7 +68,7 @@ type NATSCA struct {
 // keyDuration sizes the bootstrap certificate's validity window and must match
 // the rotator's key duration (database.DefaultKeyDuration in production) so the
 // bootstrap CA and rotator-minted CAs have consistent lifetimes.
-func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
+func FetchOrCreateInitialNATSCA(ctx context.Context, logger slog.Logger, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
 	//nolint:gocritic // The CA accessor requires the same crypto key access as the rotator.
 	ctx = dbauthz.AsKeyRotator(ctx)
 
@@ -78,7 +79,7 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDurat
 		return nil, xerrors.Errorf("get crypto keys by feature: %w", err)
 	}
 
-	ca, ok, err := parseNATSCAKeys(keys, now)
+	ca, ok, err := parseNATSCAKeys(ctx, logger, keys, now)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDurat
 		// before we blocked on the lock.
 		now = dbtime.Now()
 		var ok bool
-		ca, ok, err = parseNATSCAKeys(keys, now)
+		ca, ok, err = parseNATSCAKeys(ctx, logger, keys, now)
 		if err != nil {
 			return err
 		}
@@ -148,7 +149,10 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDurat
 			return xerrors.Errorf("insert crypto key: %w", err)
 		}
 
-		ca, ok, err = parseNATSCAKeys([]database.CryptoKey{newKey}, now)
+		// Prepend the newly inserted key (highest sequence) to the rows
+		// already read in this transaction so the trust bundle still
+		// includes any old verify-only CAs alongside the new active one.
+		ca, ok, err = parseNATSCAKeys(ctx, logger, append([]database.CryptoKey{newKey}, keys...), now)
 		if err != nil {
 			return err
 		}
@@ -164,7 +168,7 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDurat
 		TxIdentifier: "fetch_nats_ca",
 	})
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("bootstrap NATS CA: %w", err)
 	}
 	return ca, nil
 }
@@ -175,18 +179,33 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, db database.Store, keyDurat
 // signing; the trust bundle contains the certificates of every row that is
 // still valid for verification. The boolean reports whether a row could act
 // as the active CA.
-func parseNATSCAKeys(keys []database.CryptoKey, now time.Time) (*NATSCA, bool, error) {
+//
+// A corrupt secret on the active (newest signable) key is fatal: there is no
+// usable CA to sign leaves with. A corrupt secret on a non-active verify-only
+// key is logged and skipped: it has already lost its usefulness as a trust
+// root, and failing the whole fetch over it would needlessly take down the
+// NATS mTLS subsystem.
+func parseNATSCAKeys(ctx context.Context, logger slog.Logger, keys []database.CryptoKey, now time.Time) (*NATSCA, bool, error) {
 	ca := &NATSCA{}
 	for _, key := range keys {
 		if !key.CanVerify(now) {
 			continue
 		}
+		// The newest signable key we have not yet claimed becomes the active
+		// CA. Its secret must parse; everything else is a best-effort trust
+		// root.
+		isActiveCandidate := ca.Cert == nil && key.CanSign(now)
 		cert, signer, err := parseCASecret(key.Secret.String)
 		if err != nil {
-			return nil, false, xerrors.Errorf("parse CA secret for sequence %d: %w", key.Sequence, err)
+			if isActiveCandidate {
+				return nil, false, xerrors.Errorf("parse active CA secret for sequence %d: %w", key.Sequence, err)
+			}
+			logger.Warn(ctx, "skipping corrupt non-active NATS CA key",
+				slog.F("sequence", key.Sequence), slog.Error(err))
+			continue
 		}
 		ca.TrustBundle = append(ca.TrustBundle, cert)
-		if ca.Cert == nil && key.CanSign(now) {
+		if isActiveCandidate {
 			ca.Sequence = key.Sequence
 			ca.Cert = cert
 			ca.Key = signer
@@ -293,6 +312,13 @@ func parseCASecret(secret string) (*x509.Certificate, crypto.Signer, error) {
 	}
 	if !key.PublicKey.Equal(cert.PublicKey) {
 		return nil, nil, xerrors.New("private key does not match certificate")
+	}
+	// Reject a structurally valid bundle whose certificate cannot act as a
+	// signing CA. Without this, a corrupted secret could yield a non-CA cert
+	// that silently becomes the active signer; leaves signed under it would
+	// then fail x509 verification on every replica.
+	if !cert.IsCA || !cert.BasicConstraintsValid || cert.KeyUsage&x509.KeyUsageCertSign == 0 {
+		return nil, nil, xerrors.New("certificate is not a valid signing CA")
 	}
 	return cert, key, nil
 }

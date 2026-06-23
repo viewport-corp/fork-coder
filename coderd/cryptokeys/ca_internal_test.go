@@ -69,7 +69,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 		db, _ := dbtestutil.NewDB(t)
 		ctx := testutil.Context(t, testutil.WaitShort)
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.NotNil(t, ca.Cert)
 		require.NotNil(t, ca.Key)
@@ -77,7 +77,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 		require.Equal(t, ca.Cert, ca.TrustBundle[0])
 
 		// A second fetch returns the same CA without inserting another row.
-		again, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
+		again, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, ca.Sequence, again.Sequence)
 		require.Equal(t, ca.Cert.Raw, again.Cert.Raw)
@@ -92,6 +92,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 
 		db, _ := dbtestutil.NewDB(t)
 		ctx := testutil.Context(t, testutil.WaitLong)
+		logger := testutil.Logger(t)
 
 		const fetchers = 8
 		cas := make([]*NATSCA, fetchers)
@@ -101,7 +102,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				cas[i], errs[i] = FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
+				cas[i], errs[i] = FetchOrCreateInitialNATSCA(ctx, logger, db, DefaultKeyDuration)
 			}()
 		}
 		wg.Wait()
@@ -145,7 +146,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 			DeletesAt: sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		})
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, newKey.Sequence, ca.Sequence)
 
@@ -184,7 +185,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 			StartsAt: now.Add(time.Hour),
 		})
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, db, DefaultKeyDuration)
+		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
 		require.NoError(t, err)
 		require.Equal(t, current.Sequence, ca.Sequence)
 		require.Len(t, ca.TrustBundle, 2)
