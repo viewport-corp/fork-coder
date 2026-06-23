@@ -11761,7 +11761,7 @@ func TestUpsertAISeats(t *testing.T) {
 	require.False(t, alreadyExists)
 }
 
-func TestUpsertUserDailySpend(t *testing.T) {
+func TestUpsertUserAIDailySpend(t *testing.T) {
 	t.Parallel()
 
 	// Use fixed dates to keep the test deterministic.
@@ -11793,7 +11793,7 @@ func TestUpsertUserDailySpend(t *testing.T) {
 			var row database.AIUserDailySpend
 			var err error
 			for _, cost := range tt.costs {
-				row, err = db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+				row, err = db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 					UserID:           user.ID,
 					EffectiveGroupID: group.ID,
 					Day:              day,
@@ -11826,13 +11826,13 @@ func TestUpsertUserDailySpend(t *testing.T) {
 		org := dbgen.Organization(t, db, database.Organization{})
 		group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		userARow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		userARow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: userA.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 100,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int64(100), userARow.SpendMicros)
 
-		userBRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		userBRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: userB.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 25,
 		})
 		require.NoError(t, err)
@@ -11850,13 +11850,13 @@ func TestUpsertUserDailySpend(t *testing.T) {
 		groupA := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 		groupB := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		groupARow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		groupARow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: groupA.ID, Day: day, CostMicros: 100,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int64(100), groupARow.SpendMicros)
 
-		groupBRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		groupBRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: groupB.ID, Day: day, CostMicros: 25,
 		})
 		require.NoError(t, err)
@@ -11873,7 +11873,7 @@ func TestUpsertUserDailySpend(t *testing.T) {
 		org := dbgen.Organization(t, db, database.Organization{})
 		group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		dayRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		dayRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 100,
 		})
 		require.NoError(t, err)
@@ -11881,7 +11881,7 @@ func TestUpsertUserDailySpend(t *testing.T) {
 
 		// The ON CONFLICT target is the full PK including day, so this upsert
 		// cannot modify the previous day's row by construction.
-		nextDayRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		nextDayRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: nextDay, CostMicros: 25,
 		})
 		require.NoError(t, err)
@@ -11899,13 +11899,13 @@ func TestUpsertUserDailySpend(t *testing.T) {
 		org := dbgen.Organization(t, db, database.Organization{})
 		group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		_, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 100,
 		})
 		require.NoError(t, err)
 
 		dayNonTruncated := day.Add(14*time.Hour + 30*time.Minute)
-		nonTruncatedRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		nonTruncatedRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: dayNonTruncated, CostMicros: 50,
 		})
 		require.NoError(t, err)
@@ -11926,7 +11926,7 @@ func TestUpsertUserDailySpend(t *testing.T) {
 
 		// 2024-06-15 23:00 in UTC-5 is 2024-06-16 04:00 UTC, so this should land on nextDay (2024-06-16).
 		localLate := time.Date(2024, 6, 15, 23, 0, 0, 0, time.FixedZone("UTC-5", -5*3600))
-		nonUTCRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		nonUTCRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: localLate, CostMicros: 100,
 		})
 		require.NoError(t, err)
@@ -11944,21 +11944,21 @@ func TestUpsertUserDailySpend(t *testing.T) {
 		group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
 		// Zero-cost upsert on a fresh key creates a row with spend = 0.
-		newRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		newRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 0,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int64(0), newRow.SpendMicros)
 
 		// After a real upsert, the row has spend = 100.
-		updatedRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		updatedRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 100,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int64(100), updatedRow.SpendMicros)
 
 		// Zero-cost upsert on the existing row leaves spend unchanged.
-		sameRow, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		sameRow, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: day, CostMicros: 0,
 		})
 		require.NoError(t, err)
@@ -11967,7 +11967,7 @@ func TestUpsertUserDailySpend(t *testing.T) {
 	})
 }
 
-func TestGetUserSpendSince(t *testing.T) {
+func TestGetUserAISpendSince(t *testing.T) {
 	t.Parallel()
 
 	// Use fixed dates to keep the test deterministic.
@@ -12004,7 +12004,7 @@ func TestGetUserSpendSince(t *testing.T) {
 			group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
 			for _, r := range tt.rows {
-				_, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+				_, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 					UserID:           user.ID,
 					EffectiveGroupID: group.ID,
 					Day:              r.day,
@@ -12013,7 +12013,7 @@ func TestGetUserSpendSince(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			got, err := db.GetUserSpendSince(ctx, database.GetUserSpendSinceParams{
+			got, err := db.GetUserAISpendSince(ctx, database.GetUserAISpendSinceParams{
 				UserID:           user.ID,
 				EffectiveGroupID: group.ID,
 				PeriodStart:      monthStart,
@@ -12037,16 +12037,16 @@ func TestGetUserSpendSince(t *testing.T) {
 		org := dbgen.Organization(t, db, database.Organization{})
 		group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		_, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: userA.ID, EffectiveGroupID: group.ID, Day: today, CostMicros: 100,
 		})
 		require.NoError(t, err)
-		_, err = db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err = db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: userB.ID, EffectiveGroupID: group.ID, Day: today, CostMicros: 25,
 		})
 		require.NoError(t, err)
 
-		got, err := db.GetUserSpendSince(ctx, database.GetUserSpendSinceParams{
+		got, err := db.GetUserAISpendSince(ctx, database.GetUserAISpendSinceParams{
 			UserID:           userB.ID,
 			EffectiveGroupID: group.ID,
 			PeriodStart:      monthStart,
@@ -12066,16 +12066,16 @@ func TestGetUserSpendSince(t *testing.T) {
 		groupA := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 		groupB := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
-		_, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: groupA.ID, Day: today, CostMicros: 100,
 		})
 		require.NoError(t, err)
-		_, err = db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err = db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: groupB.ID, Day: today, CostMicros: 25,
 		})
 		require.NoError(t, err)
 
-		got, err := db.GetUserSpendSince(ctx, database.GetUserSpendSinceParams{
+		got, err := db.GetUserAISpendSince(ctx, database.GetUserAISpendSinceParams{
 			UserID:           user.ID,
 			EffectiveGroupID: groupB.ID,
 			PeriodStart:      monthStart,
@@ -12096,11 +12096,11 @@ func TestGetUserSpendSince(t *testing.T) {
 
 		// Seed a row on prevMonthLastDay (which lies on May 31 UTC). A naive
 		// query that does not normalize the period_start would include it.
-		_, err := db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err := db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: prevMonthLastDay, CostMicros: 999,
 		})
 		require.NoError(t, err)
-		_, err = db.UpsertUserDailySpend(ctx, database.UpsertUserDailySpendParams{
+		_, err = db.UpsertUserAIDailySpend(ctx, database.UpsertUserAIDailySpendParams{
 			UserID: user.ID, EffectiveGroupID: group.ID, Day: monthStart, CostMicros: 25,
 		})
 		require.NoError(t, err)
@@ -12108,7 +12108,7 @@ func TestGetUserSpendSince(t *testing.T) {
 		// 2024-05-31 23:00 in UTC-5 is 2024-06-01 04:00 UTC, so the
 		// normalized period_start lands on June 1.
 		localLate := time.Date(2024, 5, 31, 23, 0, 0, 0, time.FixedZone("UTC-5", -5*3600))
-		got, err := db.GetUserSpendSince(ctx, database.GetUserSpendSinceParams{
+		got, err := db.GetUserAISpendSince(ctx, database.GetUserAISpendSinceParams{
 			UserID:           user.ID,
 			EffectiveGroupID: group.ID,
 			PeriodStart:      localLate,
