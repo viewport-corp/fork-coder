@@ -1,4 +1,3 @@
-import { ArrowUpRightIcon } from "lucide-react";
 import type { FC } from "react";
 import {
 	Sidebar as BaseSidebar,
@@ -24,7 +23,7 @@ const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 				)}
 				{permissions.viewAIGatewayKeys && (
 					<SidebarNavItem href="/ai/settings/gateway-keys">
-						AI Gateway Keys
+						AI Gateway keys
 					</SidebarNavItem>
 				)}
 				{permissions.viewAnyAIProvider && (
@@ -33,34 +32,30 @@ const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 					</SidebarNavItem>
 				)}
 				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/ai/settings/models">Models</SidebarNavItem>
-				)}
-				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/ai/settings/instructions">
-						Instructions
-					</SidebarNavItem>
-				)}
-				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/ai/settings/lifecycle">
-						Lifecycle
-					</SidebarNavItem>
-				)}
-				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/ai/settings/templates">
-						Templates
-					</SidebarNavItem>
-				)}
-				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/ai/settings/mcp-servers">
-						MCP servers
-					</SidebarNavItem>
-				)}
-				{permissions.editDeploymentConfig && (
-					<SidebarNavItem href="/agents/settings/agents">
-						<div className="flex flex-row items-center gap-1">
-							Manage Coder Agents <ArrowUpRightIcon size={16} />
+					<>
+						<SidebarNavItem href="/ai/settings/agents">
+							Coder Agents
+						</SidebarNavItem>
+						<div className="flex flex-col gap-1 pl-3">
+							<SidebarNavItem href="/ai/settings/agent-settings">
+								Agent settings
+							</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/models">Models</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/mcp-servers">
+								MCP servers
+							</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/templates">
+								Templates
+							</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/spend">Spend</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/instructions">
+								Instructions
+							</SidebarNavItem>
+							<SidebarNavItem href="/ai/settings/lifecycle">
+								Lifecycle
+							</SidebarNavItem>
 						</div>
-					</SidebarNavItem>
+					</>
 				)}
 			</div>
 		</BaseSidebar>
