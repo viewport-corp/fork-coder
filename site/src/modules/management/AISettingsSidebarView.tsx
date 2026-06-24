@@ -27,8 +27,9 @@ const SubNavItem: FC<{ href: string; children?: ReactNode }> = ({
 		className={({ isActive }) =>
 			cn(
 				"relative -ml-px text-sm text-content-secondary no-underline font-medium py-2 pl-4 pr-3 transition-colors",
-				"border-l border-transparent hover:text-content-primary",
-				isActive && "border-content-primary font-semibold text-content-primary",
+				"border-0 border-solid border-l border-l-transparent hover:text-content-primary",
+				isActive &&
+					"border-l-content-primary font-semibold text-content-primary",
 			)
 		}
 	>
@@ -62,7 +63,7 @@ const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 						<SidebarNavItem href="/ai/settings/agents">
 							Coder Agents
 						</SidebarNavItem>
-						<div className="flex flex-col gap-1 ml-3 border-l border-border">
+						<div className="flex flex-col gap-1 ml-3 border-0 border-solid border-l border-l-border">
 							<SubNavItem href="/ai/settings/models">Models</SubNavItem>
 							<SubNavItem href="/ai/settings/mcp-servers">
 								MCP servers
