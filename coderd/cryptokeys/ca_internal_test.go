@@ -9,7 +9,6 @@ import (
 	"database/sql"
 	"encoding/pem"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
@@ -144,62 +143,48 @@ func generateNonCAPEM(t *testing.T, now time.Time) (certPEM, keyPEM []byte) {
 	return pemBlock(caCertPEMBlockType, der), pemBlock(caKeyPEMBlockType, keyDER)
 }
 
-func TestFetchOrCreateInitialNATSCA(t *testing.T) {
+func TestFetchNATSCA(t *testing.T) {
 	t.Parallel()
 
-	t.Run("CreatesWhenMissing", func(t *testing.T) {
+	t.Run("NotFoundWhenMissing", func(t *testing.T) {
 		t.Parallel()
 
 		db, _ := dbtestutil.NewDB(t)
 		ctx := testutil.Context(t, testutil.WaitShort)
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
-		require.NoError(t, err)
-		require.NotNil(t, ca.Cert)
-		require.NotNil(t, ca.Key)
-		require.Len(t, ca.TrustBundle, 1)
-		require.Equal(t, ca.Cert, ca.TrustBundle[0])
-
-		// A second fetch returns the same CA without inserting another row.
-		again, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
-		require.NoError(t, err)
-		require.Equal(t, ca.Sequence, again.Sequence)
-		require.Equal(t, ca.Cert.Raw, again.Cert.Raw)
+		// FetchNATSCA never creates: with no nats_ca rows it reports the
+		// transient not-found condition the rotator resolves.
+		_, err := FetchNATSCA(ctx, db)
+		require.ErrorIs(t, err, ErrNATSCANotFound)
 
 		keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNatsCa)
 		require.NoError(t, err)
-		require.Len(t, keys, 1)
+		require.Empty(t, keys)
 	})
 
-	t.Run("ConcurrentCreate", func(t *testing.T) {
+	t.Run("ReturnsActive", func(t *testing.T) {
 		t.Parallel()
 
 		db, _ := dbtestutil.NewDB(t)
-		ctx := testutil.Context(t, testutil.WaitLong)
-		logger := testutil.Logger(t)
+		ctx := testutil.Context(t, testutil.WaitShort)
+		now := time.Now().UTC()
 
-		const fetchers = 8
-		cas := make([]*NATSCA, fetchers)
-		errs := make([]error, fetchers)
-		var wg sync.WaitGroup
-		for i := range fetchers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				cas[i], errs[i] = FetchOrCreateInitialNATSCA(ctx, logger, db, DefaultKeyDuration)
-			}()
-		}
-		wg.Wait()
+		current := dbgen.CryptoKey(t, db, database.CryptoKey{
+			Feature:  database.CryptoKeyFeatureNatsCa,
+			Sequence: 1,
+			StartsAt: now.Add(-time.Hour),
+		})
 
-		for i := range fetchers {
-			require.NoError(t, errs[i])
-			require.Equal(t, cas[0].Sequence, cas[i].Sequence)
-			require.Equal(t, cas[0].Cert.Raw, cas[i].Cert.Raw)
-		}
-
-		keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNatsCa)
+		ca, err := FetchNATSCA(ctx, db)
 		require.NoError(t, err)
-		require.Len(t, keys, 1)
+		require.Equal(t, current.Sequence, ca.Sequence)
+		require.NotNil(t, ca.Cert)
+		require.NotNil(t, ca.Key)
+		require.Len(t, ca.TrustBundle, 1)
+
+		currentCert, _, err := parseCASecret(current.Secret.String)
+		require.NoError(t, err)
+		require.Equal(t, currentCert.Raw, ca.Cert.Raw)
 	})
 
 	t.Run("RotationOverlap", func(t *testing.T) {
@@ -230,7 +215,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 			DeletesAt: sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		})
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
+		ca, err := FetchNATSCA(ctx, db)
 		require.NoError(t, err)
 		require.Equal(t, newKey.Sequence, ca.Sequence)
 
@@ -269,7 +254,7 @@ func TestFetchOrCreateInitialNATSCA(t *testing.T) {
 			StartsAt: now.Add(time.Hour),
 		})
 
-		ca, err := FetchOrCreateInitialNATSCA(ctx, testutil.Logger(t), db, DefaultKeyDuration)
+		ca, err := FetchNATSCA(ctx, db)
 		require.NoError(t, err)
 		require.Equal(t, current.Sequence, ca.Sequence)
 

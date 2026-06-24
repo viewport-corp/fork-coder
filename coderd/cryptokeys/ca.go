@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"database/sql"
 	"encoding/pem"
 	"math/big"
 	"time"
@@ -35,8 +34,8 @@ const (
 // NATS cluster mTLS.
 //
 // Callers that need to react to CA rotation (re-minting leaves and reloading
-// the NATS server config) should poll FetchOrCreateInitialNATSCA and compare
-// Sequence to detect when the active CA has changed.
+// the NATS server config) should poll FetchNATSCA and compare Sequence to
+// detect when the active CA has changed.
 type NATSCA struct {
 	// Sequence is the crypto_keys sequence of the active row.
 	Sequence int32
@@ -51,26 +50,22 @@ type NATSCA struct {
 	TrustBundle []*x509.Certificate
 }
 
-// FetchOrCreateInitialNATSCA returns the current NATS cluster CA, creating the
-// initial CA if no valid one exists. The NATS pubsub is constructed before the
-// key rotator starts, so on fresh deployments the CA row will not exist at
-// first fetch; this function bootstraps it under an advisory lock so the
-// rotator has a CA to take over.
+// ErrNATSCANotFound is returned by FetchNATSCA when no active nats_ca CA row
+// exists yet. On a fresh deployment this resolves once the key rotator mints
+// the initial CA, so callers should treat it as a transient condition and
+// retry rather than a permanent failure.
+var ErrNATSCANotFound = xerrors.New("no active NATS CA found")
+
+// FetchNATSCA returns the current NATS cluster CA. It is read-only: the key
+// rotator is the sole creator of nats_ca rows, so this never inserts. Before
+// the rotator has minted the initial CA (or during a transient gap) it returns
+// ErrNATSCANotFound; callers should retry.
 //
-// Ordering constraint: the FIRST call (the one that creates the CA) must run to
-// completion before starting the key rotator (cryptokeys.StartRotator). The
-// bootstrap insert is only collision-free with respect to the rotator under
-// that ordering; see the lock comment below. In production the server satisfies
-// this by fetching the CA before calling StartRotator. Once a CA exists this
-// function is a read-only fast path, so later callers (e.g. polling for
-// rotation) may run concurrently with the rotator safely.
-//
-// keyDuration sizes the bootstrap certificate's validity window and must match
-// the rotator's key duration (database.DefaultKeyDuration in production) so the
-// bootstrap CA and rotator-minted CAs have consistent lifetimes.
-func FetchOrCreateInitialNATSCA(ctx context.Context, logger slog.Logger, db database.Store, keyDuration time.Duration) (*NATSCA, error) {
-	//nolint:gocritic // The CA accessor requires the same crypto key access as the rotator.
-	ctx = dbauthz.AsKeyRotator(ctx)
+// Callers that react to CA rotation should poll FetchNATSCA and compare the
+// returned Sequence to detect when the active CA has changed.
+func FetchNATSCA(ctx context.Context, db database.Store) (*NATSCA, error) {
+	//nolint:gocritic // The CA accessor requires the same crypto key read access as the cache.
+	ctx = dbauthz.AsKeyReader(ctx)
 
 	now := dbtime.Now()
 
@@ -79,96 +74,12 @@ func FetchOrCreateInitialNATSCA(ctx context.Context, logger slog.Logger, db data
 		return nil, xerrors.Errorf("get crypto keys by feature: %w", err)
 	}
 
-	ca, ok, err := parseNATSCAKeys(ctx, logger, keys, now)
+	ca, ok, err := parseNATSCAKeys(ctx, slog.Logger{}, keys, now)
 	if err != nil {
 		return nil, err
 	}
-	if ok {
-		return ca, nil
-	}
-
-	// No active CA exists, so create one under the rotator's advisory lock
-	// (LockIDCryptoKeyRotation). The lock plus a read-committed re-check after
-	// acquiring it keeps this startup path collision-free: it either inserts
-	// the first nats_ca row or sees a row a peer (or the rotator) already
-	// committed.
-	//
-	// This does NOT make the rotator itself collision-proof against this path.
-	// The rotator reads under Repeatable Read with a snapshot fixed when it
-	// acquires the lock, so a row committed here while it waits is invisible to
-	// it and its insert would hit a unique violation (which self-heals on its
-	// next cycle). We rely on the ordering constraint documented above
-	// (bootstrap completes before StartRotator) so the two never actually
-	// contend; the shared lock protects the startup path, not the rotator.
-	err = db.InTx(func(tx database.Store) error {
-		err := tx.AcquireLock(ctx, database.LockIDCryptoKeyRotation)
-		if err != nil {
-			return xerrors.Errorf("acquire lock: %w", err)
-		}
-
-		keys, err = tx.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNatsCa)
-		if err != nil {
-			return xerrors.Errorf("get crypto keys by feature: %w", err)
-		}
-
-		// Recompute now after acquiring the lock: a concurrent creator may
-		// have committed a row with a StartsAt later than the time captured
-		// before we blocked on the lock.
-		now = dbtime.Now()
-		var ok bool
-		ca, ok, err = parseNATSCAKeys(ctx, logger, keys, now)
-		if err != nil {
-			return err
-		}
-		if ok {
-			return nil
-		}
-
-		secret, err := generateCASecret(now, keyDuration)
-		if err != nil {
-			return xerrors.Errorf("generate CA secret: %w", err)
-		}
-
-		latestKey, err := tx.GetLatestCryptoKeyByFeature(ctx, database.CryptoKeyFeatureNatsCa)
-		if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
-			return xerrors.Errorf("get latest key: %w", err)
-		}
-
-		newKey, err := tx.InsertCryptoKey(ctx, database.InsertCryptoKeyParams{
-			Feature:  database.CryptoKeyFeatureNatsCa,
-			Sequence: latestKey.Sequence + 1,
-			Secret: sql.NullString{
-				String: secret,
-				Valid:  true,
-			},
-			// Set by dbcrypt if it's required.
-			SecretKeyID: sql.NullString{},
-			StartsAt:    now,
-		})
-		if err != nil {
-			return xerrors.Errorf("insert crypto key: %w", err)
-		}
-
-		// Prepend the newly inserted key (highest sequence) to the rows
-		// already read in this transaction so the trust bundle still
-		// includes any old verify-only CAs alongside the new active one.
-		ca, ok, err = parseNATSCAKeys(ctx, logger, append([]database.CryptoKey{newKey}, keys...), now)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return xerrors.New("inserted NATS CA is not usable for signing")
-		}
-		return nil
-	}, &database.TxOptions{
-		// Read committed (the default) is required here: with repeatable
-		// read, the snapshot is taken before the advisory lock is granted,
-		// so the post-lock re-check would not see a row committed by a
-		// concurrent creator and we would insert a duplicate.
-		TxIdentifier: "fetch_nats_ca",
-	})
-	if err != nil {
-		return nil, xerrors.Errorf("bootstrap NATS CA: %w", err)
+	if !ok {
+		return nil, ErrNATSCANotFound
 	}
 	return ca, nil
 }
