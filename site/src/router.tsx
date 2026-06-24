@@ -474,9 +474,6 @@ const AISettingsUpdateMCPServerPage = lazy(
 const AISettingsCoderAgentsPage = lazy(
 	() => import("./pages/AISettingsPage/CoderAgentsPage/CoderAgentsPage"),
 );
-const AISettingsAgentSettingsPage = lazy(
-	() => import("./pages/AISettingsPage/AgentSettingsPage/AgentSettingsPage"),
-);
 const AISettingsSpendPage = lazy(
 	() => import("./pages/AISettingsPage/SpendPage/SpendPage"),
 );
@@ -781,10 +778,6 @@ export const router = createBrowserRouter(
 						/>
 						<Route index element={<AISettingsIndexPage />} />
 						<Route path="agents" element={<AISettingsCoderAgentsPage />} />
-						<Route
-							path="agent-settings"
-							element={<AISettingsAgentSettingsPage />}
-						/>
 						<Route path="spend" element={<AISettingsSpendPage />} />
 						<Route path="models" element={<AISettingsModelsPage />} />
 						<Route

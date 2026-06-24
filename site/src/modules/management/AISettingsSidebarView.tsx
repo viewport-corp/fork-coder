@@ -1,14 +1,40 @@
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
+import { NavLink } from "react-router";
 import {
 	Sidebar as BaseSidebar,
 	SettingsSidebarNavItem as SidebarNavItem,
 } from "#/components/Sidebar/Sidebar";
 import type { Permissions } from "#/modules/permissions";
+import { cn } from "#/utils/cn";
 
 interface AISettingsSidebarViewProps {
 	/** Site-wide permissions. */
 	permissions: Permissions;
 }
+
+/**
+ * Sub-item for the Coder Agents group. The wrapping div paints a continuous
+ * left rule for the whole group; each item's own left border sits on top of
+ * that rule via a negative left margin, so the active item lights up a
+ * matching segment instead of drawing a second parallel line.
+ */
+const SubNavItem: FC<{ href: string; children?: ReactNode }> = ({
+	href,
+	children,
+}) => (
+	<NavLink
+		to={href}
+		className={({ isActive }) =>
+			cn(
+				"relative -ml-px text-sm text-content-secondary no-underline font-medium py-2 pl-4 pr-3 transition-colors",
+				"border-l border-transparent hover:text-content-primary",
+				isActive && "border-content-primary font-semibold text-content-primary",
+			)
+		}
+	>
+		{children}
+	</NavLink>
+);
 
 const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 	permissions,
@@ -36,24 +62,17 @@ const AISettingsSidebarView: FC<AISettingsSidebarViewProps> = ({
 						<SidebarNavItem href="/ai/settings/agents">
 							Coder Agents
 						</SidebarNavItem>
-						<div className="flex flex-col gap-1 pl-3">
-							<SidebarNavItem href="/ai/settings/agent-settings">
-								Agent settings
-							</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/models">Models</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/mcp-servers">
+						<div className="flex flex-col gap-1 ml-3 border-l border-border">
+							<SubNavItem href="/ai/settings/models">Models</SubNavItem>
+							<SubNavItem href="/ai/settings/mcp-servers">
 								MCP servers
-							</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/templates">
-								Templates
-							</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/spend">Spend</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/instructions">
+							</SubNavItem>
+							<SubNavItem href="/ai/settings/templates">Templates</SubNavItem>
+							<SubNavItem href="/ai/settings/spend">Spend</SubNavItem>
+							<SubNavItem href="/ai/settings/instructions">
 								Instructions
-							</SidebarNavItem>
-							<SidebarNavItem href="/ai/settings/lifecycle">
-								Lifecycle
-							</SidebarNavItem>
+							</SubNavItem>
+							<SubNavItem href="/ai/settings/lifecycle">Lifecycle</SubNavItem>
 						</div>
 					</>
 				)}
