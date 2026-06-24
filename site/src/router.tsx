@@ -471,6 +471,15 @@ const AISettingsUpdateMCPServerPage = lazy(
 			"./pages/AISettingsPage/MCPServersPage/UpdateMCPServerPage/UpdateMCPServerPage"
 		),
 );
+const AISettingsCoderAgentsPage = lazy(
+	() => import("./pages/AISettingsPage/CoderAgentsPage/CoderAgentsPage"),
+);
+const AISettingsAgentSettingsPage = lazy(
+	() => import("./pages/AISettingsPage/AgentSettingsPage/AgentSettingsPage"),
+);
+const AISettingsSpendPage = lazy(
+	() => import("./pages/AISettingsPage/SpendPage/SpendPage"),
+);
 
 const AISettingsIndexPage = () => {
 	const { permissions } = useAuthenticated();
@@ -771,6 +780,12 @@ export const router = createBrowserRouter(
 							element={<AISettingsGatewayKeysPage />}
 						/>
 						<Route index element={<AISettingsIndexPage />} />
+						<Route path="agents" element={<AISettingsCoderAgentsPage />} />
+						<Route
+							path="agent-settings"
+							element={<AISettingsAgentSettingsPage />}
+						/>
+						<Route path="spend" element={<AISettingsSpendPage />} />
 						<Route path="models" element={<AISettingsModelsPage />} />
 						<Route
 							path="instructions"
