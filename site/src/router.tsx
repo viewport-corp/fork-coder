@@ -777,6 +777,7 @@ export const router = createBrowserRouter(
 							element={<AISettingsInstructionsPage />}
 						/>
 						<Route path="lifecycle" element={<AISettingsLifecyclePage />} />
+						<Route path="coder-agents" element={<AgentSettingsAgentsPage />} />
 						<Route path="templates" element={<AISettingsTemplatesPage />} />
 						<Route path="models/add" element={<AISettingsAddModelPage />} />
 						<Route
@@ -881,8 +882,14 @@ export const router = createBrowserRouter(
 							path="personal-skills"
 							element={<AgentSettingsPersonalSkillsPage />}
 						/>
-						<Route path="admin" element={<AgentSettingsAgentsPage />} />
-						<Route path="agents" element={<AgentSettingsAgentsPage />} />
+						<Route
+							path="admin"
+							element={<Navigate to="/ai/settings/coder-agents" replace />}
+						/>
+						<Route
+							path="agents"
+							element={<Navigate to="/ai/settings/coder-agents" replace />}
+						/>
 						<Route path="api-keys" element={<AgentSettingsAPIKeysPage />} />
 						<Route
 							path="providers"
