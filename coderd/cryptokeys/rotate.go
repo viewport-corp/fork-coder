@@ -246,7 +246,7 @@ func generateNewSecret(feature database.CryptoKeyFeature, startsAt time.Time, ke
 		return generateKey(64)
 	case database.CryptoKeyFeatureTailnetResume:
 		return generateKey(64)
-	case database.CryptoKeyFeatureNatsCa:
+	case database.CryptoKeyFeatureNATSCa:
 		return generateCASecret(startsAt, keyDuration)
 	}
 	return "", xerrors.Errorf("unknown feature: %s", feature)
@@ -271,7 +271,7 @@ func tokenDuration(feature database.CryptoKeyFeature) time.Duration {
 		return OIDCConvertTokenDuration
 	case database.CryptoKeyFeatureTailnetResume:
 		return TailnetResumeTokenDuration
-	case database.CryptoKeyFeatureNatsCa:
+	case database.CryptoKeyFeatureNATSCa:
 		return NATSCALeafValidity
 	default:
 		return 0

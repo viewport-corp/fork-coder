@@ -121,14 +121,14 @@ func Test_rotateKeys(t *testing.T) {
 			clock:       clock,
 			logger:      logger,
 			features: []database.CryptoKeyFeature{
-				database.CryptoKeyFeatureNatsCa,
+				database.CryptoKeyFeatureNATSCa,
 			},
 		}
 
 		now := dbnow(clock)
 
 		oldKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			StartsAt: now,
 			Sequence: 4,
 		})
@@ -149,11 +149,11 @@ func Test_rotateKeys(t *testing.T) {
 		require.Equal(t, expectedDeletesAt, oldKey.DeletesAt.Time.UTC())
 
 		newKey, err := db.GetCryptoKeyByFeatureAndSequence(ctx, database.GetCryptoKeyByFeatureAndSequenceParams{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: oldKey.Sequence + 1,
 		})
 		require.NoError(t, err)
-		requireKey(t, newKey, database.CryptoKeyFeatureNatsCa, oldKey.ExpiresAt(keyDuration), nullTime, oldKey.Sequence+1)
+		requireKey(t, newKey, database.CryptoKeyFeatureNATSCa, oldKey.ExpiresAt(keyDuration), nullTime, oldKey.Sequence+1)
 	})
 
 	t.Run("DoesNotRotateValidKeys", func(t *testing.T) {
@@ -472,7 +472,7 @@ func Test_rotateKeys(t *testing.T) {
 		// caused a key to be inserted.
 		require.Len(t, kbf[database.CryptoKeyFeatureTailnetResume], 1)
 		require.Len(t, kbf[database.CryptoKeyFeatureWorkspaceAppsToken], 1)
-		require.Len(t, kbf[database.CryptoKeyFeatureNatsCa], 1)
+		require.Len(t, kbf[database.CryptoKeyFeatureNATSCa], 1)
 
 		oidcKey := kbf[database.CryptoKeyFeatureOIDCConvert][0]
 		tailnetKey := kbf[database.CryptoKeyFeatureTailnetResume][0]
@@ -640,7 +640,7 @@ func requireKey(t *testing.T, key database.CryptoKey, feature database.CryptoKey
 	require.Equal(t, sequence, key.Sequence)
 
 	// The NATS CA secret is a PEM bundle rather than hex-encoded bytes.
-	if key.Feature == database.CryptoKeyFeatureNatsCa {
+	if key.Feature == database.CryptoKeyFeatureNATSCa {
 		cert, _, err := parseCASecret(key.Secret.String)
 		require.NoError(t, err)
 		require.True(t, cert.IsCA)

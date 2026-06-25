@@ -27,7 +27,7 @@ func TestNATSCACache(t *testing.T) {
 		clock.Set(now)
 
 		first := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 1,
 			StartsAt: now.Add(-time.Hour),
 		})
@@ -42,7 +42,7 @@ func TestNATSCACache(t *testing.T) {
 
 		// Simulate a rotation by inserting a higher-sequence active CA.
 		second := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 2,
 			StartsAt: now.Add(-time.Minute),
 		})

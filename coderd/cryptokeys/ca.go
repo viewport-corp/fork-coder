@@ -69,7 +69,7 @@ func FetchNATSCA(ctx context.Context, db database.Store) (*NATSCA, error) {
 
 	now := dbtime.Now()
 
-	keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNatsCa)
+	keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNATSCa)
 	if err != nil {
 		return nil, xerrors.Errorf("get crypto keys by feature: %w", err)
 	}

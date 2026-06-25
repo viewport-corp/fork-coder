@@ -157,7 +157,7 @@ func TestFetchNATSCA(t *testing.T) {
 		_, err := FetchNATSCA(ctx, db)
 		require.ErrorIs(t, err, ErrNATSCANotFound)
 
-		keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNatsCa)
+		keys, err := db.GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureNATSCa)
 		require.NoError(t, err)
 		require.Empty(t, keys)
 	})
@@ -170,7 +170,7 @@ func TestFetchNATSCA(t *testing.T) {
 		now := time.Now().UTC()
 
 		current := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 1,
 			StartsAt: now.Add(-time.Hour),
 		})
@@ -197,19 +197,19 @@ func TestFetchNATSCA(t *testing.T) {
 		// Old CA scheduled for deletion in the future: still a trust root,
 		// no longer the active signer.
 		oldKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:   database.CryptoKeyFeatureNatsCa,
+			Feature:   database.CryptoKeyFeatureNATSCa,
 			Sequence:  1,
 			StartsAt:  now.Add(-2 * time.Hour),
 			DeletesAt: sql.NullTime{Time: now.Add(time.Hour), Valid: true},
 		})
 		newKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 2,
 			StartsAt: now.Add(-time.Hour),
 		})
 		// Deleted key: excluded entirely.
 		deletedKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:   database.CryptoKeyFeatureNatsCa,
+			Feature:   database.CryptoKeyFeatureNATSCa,
 			Sequence:  3,
 			StartsAt:  now.Add(-3 * time.Hour),
 			DeletesAt: sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
@@ -242,14 +242,14 @@ func TestFetchNATSCA(t *testing.T) {
 		now := time.Now().UTC()
 
 		current := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 1,
 			StartsAt: now.Add(-time.Hour),
 		})
 		// A rotated-in key that hasn't started yet must not be the active
 		// signer, but its cert belongs in the trust bundle.
 		future := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureNatsCa,
+			Feature:  database.CryptoKeyFeatureNATSCa,
 			Sequence: 2,
 			StartsAt: now.Add(time.Hour),
 		})
