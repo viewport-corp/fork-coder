@@ -11,16 +11,18 @@ You can install those yourself with a package manager like [Homebrew](https://br
 In this guide, you install both Homebrew and mise,
 install a tool with each,
 and learn which installs survive a workspace restart and why.
+You then change the template so the Homebrew tools persist too.
 
 > [!NOTE]
 > This guide works inside a running workspace from the Quickstart template.
-> It doesn't edit the template, though making Homebrew tools persist does, as you'll see at the end.
+> Most of it runs in the workspace, but the last step edits the template so Homebrew can persist.
 
 ## What you'll do
 
 - ✅ Install command-line tools with [Homebrew](https://brew.sh/) and [mise](https://mise.jdx.dev/) into your workspace.
 - ✅ Restart the workspace and see which tools persist.
-- ✅ Learn why one persists and the other doesn't, and how to make either one stay.
+- ✅ Learn why one persists and the other doesn't.
+- ✅ Wire up Homebrew so its tools persist too.
 
 ## What persists in a workspace
 
@@ -33,7 +35,8 @@ A tool survives a restart only when both of these are true:
 - The tool installs into `/home/coder`.
 - Your shell finds the tool through a file in `/home/coder`, such as `.bashrc`.
 
-You'll install tools two ways and then restart to see this rule decide which ones stay.
+You'll install tools two ways and restart to see this rule decide which ones stay,
+then change the template so Homebrew follows the rule too.
 
 ## Step 1: Install Homebrew and mise
 
@@ -60,13 +63,18 @@ curl -fsSL https://mise.run | sh
 ```
 
 mise installs to `~/.local/bin/mise`, inside your home directory.
-Activate it in every new shell:
+Activate it so every new shell loads it:
 
 ```sh
 echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
 ```
 
-Open a new terminal so both changes take effect,
+Activation only takes effect in shells that start after this change,
+so open a new terminal (or run `source ~/.bashrc`) before you use mise.
+Until you do, `mise doctor` reports that mise isn't activated, which is expected at this point.
+For other shells, refer to [Activate mise](https://mise.jdx.dev/getting-started.html#activate-mise).
+
+Open a new terminal so both the Homebrew and mise changes take effect,
 then confirm each manager runs:
 
 ```sh
@@ -112,51 +120,161 @@ The restart rebuilds the container from the image and keeps only your home direc
 ### UI
 
 Open your workspace in the Coder dashboard and select **Restart**.
+When it's back, reconnect your terminal: reopen the web terminal,
+or run `coder ssh <your-workspace>` from your own machine.
 
 ### CLI
 
-Restart the workspace from a terminal on your own machine,
-using your workspace's name:
+From a terminal on your own machine, restart the workspace by name,
+then reconnect when it's back:
 
 ```sh
 coder restart <your-workspace>
+coder ssh <your-workspace>
 ```
 
 </div>
 
-Open a terminal and run both commands again:
+When you reconnect, your shell prints an error before you run anything:
+
+```text
+bash: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+```
+
+That's the first sign something changed.
+Your `.bashrc` still tries to load Homebrew, but the restart removed it.
+Check each tool to see what survived.
+
+`bat`, installed with mise, still works:
 
 ```sh
 bat --version
+```
+
+```text
+bat 0.26.1
+```
+
+`rg`, installed with Homebrew, is gone:
+
+```sh
 rg --version
 ```
 
-This time the results differ.
-`bat` reports its version, because mise installed it under `/home/coder`, which persists.
-`rg` is gone, and so is `brew` itself:
-
 ```text
-rg: command not found
-brew: command not found
+bash: rg: command not found
 ```
 
+So is `brew` itself:
+
+```sh
+brew --version
+```
+
+```text
+bash: brew: command not found
+```
+
+mise installed `bat` under `/home/coder`, which persists, so `bat` survived.
 Homebrew installed `ripgrep` to `/home/linuxbrew`, outside `/home/coder`,
-so the rebuild discarded both Homebrew and every formula you installed with it.
+so the rebuild discarded Homebrew and every formula you installed with it.
+The `brew shellenv` line stayed in your `.bashrc` because it lives in `/home/coder`,
+which is why your shell still tries to load the missing `brew` and prints the error above.
+
+## Step 4: Make Homebrew survive restarts
+
+Homebrew survives a restart only if `/home/linuxbrew` survives the rebuild.
+Give it a persistent volume in the template, the way the Coder dogfood template does,
+so Homebrew and its formulae stay between restarts.
+
+> [!NOTE]
+> This step edits the template.
+> If it isn't open for editing, refer to [Customize workspace startup](./customize-workspace-startup.md#open-the-template-for-editing).
+
+In `main.tf`, add a volume for Homebrew's directory next to the existing `home_volume`:
+
+```tf
+resource "docker_volume" "homebrew_volume" {
+  name = "coder-${data.coder_workspace.me.id}-homebrew"
+  lifecycle {
+    ignore_changes = all
+  }
+}
+```
+
+Then mount it in the `docker_container "workspace"` resource,
+alongside the block that mounts `/home/coder`:
+
+```tf
+  volumes {
+    container_path = "/home/linuxbrew"
+    volume_name    = docker_volume.homebrew_volume.name
+    read_only      = false
+  }
+```
+
+Publish the change and restart the workspace:
+
+<div class="tabs">
+
+### UI
+
+In the web editor, make the edits above in `main.tf`.
+Select **Build**, wait for the build to pass, then select **Publish**.
+On your workspace's home tab, select **Update and restart**.
+
+### CLI
+
+Make the edits in `~/coder-quickstart/main.tf`,
+then publish and update by name:
+
+```sh
+coder templates push -d ~/coder-quickstart -y quickstart
+coder update <your-workspace>
+```
+
+</div>
+
+The restart gives you a persistent but empty `/home/linuxbrew`.
+Your earlier Homebrew install is gone, so install it once more.
+This time it lands on the volume:
+
+```sh
+NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+The `brew shellenv` line is still in your `.bashrc` from Step 1,
+so open a new terminal to load it, then reinstall `ripgrep`:
+
+```sh
+brew install ripgrep
+```
+
+Restart the workspace once more and reconnect.
+This time the startup error is gone, and both tools report their versions:
+
+```sh
+rg --version
+brew --version
+```
+
+Homebrew now persists because `/home/linuxbrew` lives on its own volume,
+the same way mise's tools persist because they live in `/home/coder`.
 
 ## What just happened
 
 The two package managers behaved differently for one reason: where each one installs.
 
 - mise installs into `~/.local/share/mise`, inside your home directory, and activates from `~/.bashrc`. Both are in `/home/coder`, so its tools persist with no template change.
-- Homebrew installs to `/home/linuxbrew`, outside `/home/coder`, so its tools are discarded on every restart.
+- Homebrew installs to `/home/linuxbrew`, outside `/home/coder`, so its tools are discarded on every restart until you mount that path on a persistent volume.
 
 To keep a tool, choose the approach that matches who needs it:
 
-- For a tool that's yours alone, install it with mise. It persists through restarts with no further setup.
-- To make Homebrew persist, update the template to mount its prefix, `/home/linuxbrew`, on a persistent volume, the way the Coder dogfood template does. This is a template change, so it affects everyone who uses the template.
+- For a tool that's yours alone, install it with mise. It persists through restarts with no template change.
+- To keep your Homebrew tools, mount `/home/linuxbrew` on a persistent volume, as you did in Step 4. This is a template change, so it affects everyone who uses the template.
 - For a tool everyone needs preinstalled, add it to the startup script with `apt-get`, as in [Add a programming language](./add-a-language.md), or bake it into the workspace image.
 
-The rule underneath all three: a tool persists when it lives in a part of the workspace that persists.
+The rule underneath all of these: a tool persists when it lives in a part of the workspace that persists.
 Refer to [Resource persistence](../../admin/templates/extending-templates/resource-persistence.md) for how Coder decides what survives a restart.
 
 ## What's next?
