@@ -38278,6 +38278,8 @@ WHERE
 		--   * The workspace is not dormant and its owner is not suspended.
 		--   * The build has a deadline in the future (we never remind about a stop already due).
 		--   * The template opts in (time_til_autostop_notify > 0) and now is within the lead window.
+		--   * The owner has not used the workspace within the lead window (an
+		--     active workspace keeps getting its deadline bumped and will not stop).
 		--   * A reminder has not yet been sent for THIS deadline.
 		--
 		-- NOTE: time_til_autostop_notify has no upper bound. If it exceeds a
@@ -38298,7 +38300,13 @@ WHERE
 			workspace_builds.deadline > $1::timestamptz AND
 			templates.time_til_autostop_notify > 0 AND
 			workspace_builds.deadline <= ($1::timestamptz) + (INTERVAL '1 millisecond' * (templates.time_til_autostop_notify / 1000000)) AND
-			workspace_builds.notified_autostop_deadline != workspace_builds.deadline
+			workspace_builds.notified_autostop_deadline != workspace_builds.deadline AND
+			-- The owner must not have used the workspace within the lead window;
+			-- an active workspace keeps getting its deadline bumped and will not
+			-- stop. This keep-condition is the exact complement of the strict
+			-- skip-guard in shouldRemindAutostop (Go), so the pre-filter and the
+			-- re-check agree on the boundary.
+			($1 :: timestamptz) - workspaces.last_used_at >= (INTERVAL '1 millisecond' * (templates.time_til_autostop_notify / 1000000))
 		)
 	)
   	AND workspaces.deleted = 'false'

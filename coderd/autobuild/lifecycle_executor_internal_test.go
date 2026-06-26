@@ -153,9 +153,15 @@ func TestShouldRemindAutostop(t *testing.T) {
 		}
 	}
 
+	// idle places last_used_at well before the lead window so the active-user
+	// guard never trips. It is the default for cases that leave LastUsedAt unset;
+	// cases that exercise the active-user guard set LastUsedAt explicitly.
+	idle := currentTick.Add(-2 * ttl)
+
 	testCases := []struct {
 		Name             string
 		Build            database.WorkspaceBuild
+		LastUsedAt       time.Time
 		TemplateSchedule schedule.TemplateScheduleOptions
 		Expected         bool
 	}{
@@ -246,13 +252,39 @@ func TestShouldRemindAutostop(t *testing.T) {
 			TemplateSchedule: schedule.TemplateScheduleOptions{TimeTilAutostopNotify: ttl},
 			Expected:         true,
 		},
+		{
+			// ActiveUser: the workspace was used within the lead window, so the
+			// deadline will keep getting bumped and the reminder is suppressed.
+			Name:             "ActiveUser",
+			Build:            inWindow(),
+			LastUsedAt:       currentTick.Add(-time.Minute),
+			TemplateSchedule: schedule.TemplateScheduleOptions{TimeTilAutostopNotify: ttl},
+			Expected:         false,
+		},
+		{
+			// IdleUser: the workspace was last used well before the lead window,
+			// so it is not active and the reminder fires. This is the exact
+			// boundary complement of ActiveUser.
+			Name:             "IdleUser",
+			Build:            inWindow(),
+			LastUsedAt:       currentTick.Add(-2 * ttl),
+			TemplateSchedule: schedule.TemplateScheduleOptions{TimeTilAutostopNotify: ttl},
+			Expected:         true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
-			require.Equal(t, tc.Expected, shouldRemindAutostop(tc.Build, tc.TemplateSchedule, currentTick))
+			// Cases that do not exercise the active-user guard leave LastUsedAt
+			// unset; default those to an idle time outside the lead window.
+			lastUsedAt := tc.LastUsedAt
+			if lastUsedAt.IsZero() {
+				lastUsedAt = idle
+			}
+
+			require.Equal(t, tc.Expected, shouldRemindAutostop(tc.Build, lastUsedAt, tc.TemplateSchedule, currentTick))
 		})
 	}
 }
