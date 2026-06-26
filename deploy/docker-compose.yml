@@ -1,0 +1,64 @@
+# Coder — Viewport deploy overlay (sub-issue #416, dept "Viewport Infrastructure")
+# Part of #404. Derived verbatim from upstream coder/coder compose.yaml @ v2.33.9,
+# with Viewport guardrail adjustments. Deploy via Dokploy "Compose" service type
+# on the NEW engine (DOCKER_HOST=unix:///var/run/docker-viewport.sock).
+#
+# Set these in the Dokploy Environment tab (names only here — never commit secrets):
+#   CODER_VERSION      pinned release tag (default below: v2.33.9)
+#   CODER_ACCESS_URL   internal URL Coder is reachable on, e.g. http://194.163.153.171:7080
+#                      (NOT localhost/127.0.0.1 for non-Docker templates)
+#   POSTGRES_USER      postgres user
+#   POSTGRES_PASSWORD  postgres password (Dokploy secret)
+#   POSTGRES_DB        postgres db (default: coder)
+services:
+  coder:
+    image: ${CODER_REPO:-ghcr.io/coder/coder}:${CODER_VERSION:-v2.33.9}
+    ports:
+      - "7080:7080"
+    environment:
+      CODER_PG_CONNECTION_URL: "postgresql://${POSTGRES_USER:-username}:${POSTGRES_PASSWORD:-password}@database/${POSTGRES_DB:-coder}?sslmode=disable"
+      CODER_HTTP_ADDRESS: "0.0.0.0:7080"
+      # REQUIRED, no default. Must be reachable by workspaces; never localhost/127.0.0.1.
+      CODER_ACCESS_URL: "${CODER_ACCESS_URL}"
+    # -------------------------------------------------------------------------
+    # SAM-GATED DECISION — Docker socket mount (DO NOT enable without approval).
+    # Upstream mounts the DEFAULT socket (/var/run/docker.sock) so Coder can
+    # provision Docker-based workspace templates. Under Viewport guardrails the
+    # default socket = OLD engine = STRICTLY READ-ONLY. So it is COMMENTED OUT
+    # here: this deploys Coder as CONTROL-PLANE ONLY (no Docker workspace
+    # templates until a workspace backend is chosen). Two options, pick one:
+    #   (a) leave commented  -> control-plane only (current safe default)
+    #   (b) NEW-engine socket -> uncomment and use /var/run/docker-viewport.sock
+    #       so Coder provisions workspace containers on the NEW engine only.
+    # NEVER mount /var/run/docker.sock (old engine).
+    #volumes:
+    #  - /var/run/docker-viewport.sock:/var/run/docker.sock   # option (b) ONLY, Sam-gated
+    #  - coder_home:/home/coder
+    volumes:
+      # coder_home is optional in prod (resettable). Kept; no socket mount (see above).
+      - coder_home:/home/coder
+    depends_on:
+      database:
+        condition: service_healthy
+  database:
+    # Minimum supported version is 13. Repo default: postgres:17.
+    image: "postgres:17"
+    # Port 5432 stays internal-only (no publish — no :80/:443/DNS in scope).
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-username}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-coder}
+    volumes:
+      - coder_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-username} -d ${POSTGRES_DB:-coder}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  coder_data:
+  coder_home:
