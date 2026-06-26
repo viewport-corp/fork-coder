@@ -1,6 +1,6 @@
 # Add a programming language to your template
 
-Now that you've finished [Launch your first workspace](./launch-workspace.md),
+Now that you've finished [Launch your first workspace](../launch-workspace.md),
 you can add another language toolchain to every workspace you create.
 
 The Quickstart template installs a language only when the workspace owner
@@ -9,7 +9,7 @@ In this guide, you add Ruby as an option.
 
 > [!NOTE]
 > This guide assumes your Quickstart template is open for editing.
-> If it's not, refer to [Customize workspace startup](./customize-workspace-startup.md#open-the-template-for-editing).
+> If it's not, refer to [Customize workspace startup](./index.md#open-the-template-for-editing).
 
 ## What you'll do
 
@@ -557,7 +557,7 @@ resource "docker_container" "workspace" {
 
 ## Step 2: Add Ruby to your workspace
 
-Your workspace from [Launch your first workspace](./launch-workspace.md) is
+Your workspace from [Launch your first workspace](../launch-workspace.md) is
 still on the old template version.
 Update it to the version you just published,
 and add Ruby to its **Programming Languages** selection:
@@ -842,6 +842,6 @@ Now that you added a language, [install your own command-line tools](./install-c
 
 ## Learn more
 
-- [Parameters](../../admin/templates/extending-templates/parameters.md) in the Coder documentation
+- [Parameters](../../../admin/templates/extending-templates/parameters.md) in the Coder documentation
 - [Terraform data sources](https://developer.hashicorp.com/terraform/language/data-sources)
 - [Terraform types](https://developer.hashicorp.com/terraform/language/expressions/types) for parameter values

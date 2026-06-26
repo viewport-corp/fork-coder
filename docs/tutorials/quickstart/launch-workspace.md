@@ -446,9 +446,9 @@ then start the server again.
    coder server
    ```
 
-### What's next?
+## What's next?
 
-Now that you have a running Coder server and a running workspace, you can move on to part 2 of the Quickstart series, [Customize workspace startup](./customize-workspace-startup.md).
+Now that you have a running Coder server and a running workspace, you can move on to part 2 of the Quickstart series, [Customize workspace startup](./customize-workspace-startup/index.md).
 
 You can also start exploring more advanced capabilities that Coder offers:
 

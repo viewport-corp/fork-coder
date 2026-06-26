@@ -1,6 +1,6 @@
 # Customize workspace startup
 
-In [Launch your first workspace](./launch-workspace.md), you installed the `coder` CLI,
+In [Launch your first workspace](../launch-workspace.md), you installed the `coder` CLI,
 started the Coder server,
 and built a workspace from the Quickstart template.
 That template is a good starting point,
@@ -112,6 +112,6 @@ publish the new version from the editor each time a guide tells you to push.
 
 ## Learn more
 
-- [Extending templates](../../admin/templates/extending-templates/index.md) in the Coder documentation
+- [Extending templates](../../../admin/templates/extending-templates/index.md) in the Coder documentation
 - [Terraform documentation](https://developer.hashicorp.com/terraform) from HashiCorp
 - First guide: [Add a programming language](./add-a-language.md)

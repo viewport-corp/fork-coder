@@ -1,6 +1,6 @@
 # Install your own command-line tools
 
-Now that you've finished [Launch your first workspace](./launch-workspace.md),
+Now that you've finished [Launch your first workspace](../launch-workspace.md),
 you can add your favorite command-line tools to every workspace.
 
 The Quickstart template installs system languages through the **Programming Languages** parameter,
@@ -183,13 +183,12 @@ which is why your shell still tries to load the missing `brew` and prints the er
 
 ## Step 4: Make Homebrew survive restarts
 
-Homebrew survives a restart only if `/home/linuxbrew` survives the rebuild.
-Give it a persistent volume in the template, the way the Coder dogfood template does,
-so Homebrew and its formulae stay between restarts.
+To make Homebrew survive a restart, you'll edit the template and add a persistent volume.
+The volume backs `/home/linuxbrew`, the prefix where Homebrew installs, so Homebrew and its formulae stay between restarts.
 
 > [!NOTE]
 > This step edits the template.
-> If it isn't open for editing, refer to [Customize workspace startup](./customize-workspace-startup.md#open-the-template-for-editing).
+> If it isn't open for editing, refer to [Customize workspace startup](./index.md#open-the-template-for-editing).
 
 In `main.tf`, add a volume for Homebrew's directory next to the existing `home_volume`:
 
@@ -275,7 +274,7 @@ To keep a tool, choose the approach that matches who needs it:
 - For a tool everyone needs preinstalled, add it to the startup script with `apt-get`, as in [Add a programming language](./add-a-language.md), or bake it into the workspace image.
 
 The rule underneath all of these: a tool persists when it lives in a part of the workspace that persists.
-Refer to [Resource persistence](../../admin/templates/extending-templates/resource-persistence.md) for how Coder decides what survives a restart.
+Refer to [Resource persistence](../../../admin/templates/extending-templates/resource-persistence.md) for how Coder decides what survives a restart.
 
 ## What's next?
 
@@ -285,5 +284,5 @@ Now that you can install your own tools, [personalize your workspace with dotfil
 
 - [Homebrew documentation](https://brew.sh/) for the package manager
 - [mise documentation](https://mise.jdx.dev/) for the version manager
-- [Resource persistence](../../admin/templates/extending-templates/resource-persistence.md) in the Coder documentation
-- [Dotfiles](../../user-guides/workspace-dotfiles.md) in the Coder documentation
+- [Resource persistence](../../../admin/templates/extending-templates/resource-persistence.md) in the Coder documentation
+- [Dotfiles](../../../user-guides/workspace-dotfiles.md) in the Coder documentation
