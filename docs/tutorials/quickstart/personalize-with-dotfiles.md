@@ -50,8 +50,8 @@ then publish a new version of the template:
 
 ### UI
 
-In the web editor, add the `module` block to `main.tf`,
-then select **Build** to publish a new version.
+In the web editor, add the `module` block to `main.tf`.
+Select **Build**, wait for the build to pass, then select **Publish**.
 
 ### CLI
 

@@ -115,7 +115,8 @@ Open your workspace in the Coder dashboard and select **Restart**.
 
 ### CLI
 
-Restart the workspace from a terminal on your own machine:
+Restart the workspace from a terminal on your own machine,
+using your workspace's name:
 
 ```sh
 coder restart <your-workspace>

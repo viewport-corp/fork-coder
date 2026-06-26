@@ -76,8 +76,8 @@ Now publish the change as a new template version:
 
 ### UI
 
-In the web editor, make the edit above in `main.tf`,
-then select **Build** to publish a new version.
+In the web editor, make the edit above in `main.tf`.
+Select **Build**, wait for the build to pass, then select **Publish**.
 
 ### CLI
 
@@ -158,13 +158,13 @@ and add Ruby to its **Programming Languages** selection:
 
 ### UI
 
-1. Open your workspace and select **Update**.
-2. In the parameters, add **Ruby** to **Programming Languages**.
-3. Confirm to rebuild the workspace on the new version.
+On your workspace, add **Ruby** to the **Programming Languages** parameter,
+then select **Update and restart**.
 
 ### CLI
 
-Update the workspace and re-select its parameters:
+Update the workspace and re-select its parameters.
+Replace `<your-workspace>` with your workspace's name (run `coder list` to see it):
 
 ```sh
 coder update <your-workspace> --always-prompt
@@ -233,9 +233,9 @@ Publish the change, then update your workspace again:
 
 ### UI
 
-In the web editor, make the edit above in `install-languages.sh.tftpl`,
-then select **Build** to publish a new version.
-Open your workspace and select **Update** to rebuild it.
+1. In the web editor, make the edit above in `install-languages.sh.tftpl`.
+2. Select **Build**, wait for the build to pass, then select **Publish**.
+3. On your workspace's home tab, select **Update and restart**.
 
 ### CLI
 
