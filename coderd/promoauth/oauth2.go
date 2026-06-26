@@ -34,6 +34,17 @@ const (
 	SourceGitAPITeamMemberships Oauth2Source = "GitAPITeamMemberships"
 )
 
+// TokenValidationResult is the outcome of an external auth token validation.
+type TokenValidationResult string
+
+const (
+	// TokenValidationConfirmed is set when the provider returned HTTP 200.
+	TokenValidationConfirmed TokenValidationResult = "confirmed"
+	// TokenValidationRateLimited is set when the validation endpoint returned a
+	// 403 with rate-limit headers or a 429.
+	TokenValidationRateLimited TokenValidationResult = "rate_limited"
+)
+
 // OAuth2Config exposes a subset of *oauth2.Config functions for easier testing.
 // *oauth2.Config should be used instead of implementing this in production.
 type OAuth2Config interface {
@@ -52,6 +63,10 @@ type InstrumentedOAuth2Config interface {
 	// Do is provided as a convenience method to make a request with the oauth2 client.
 	// It mirrors `http.Client.Do`.
 	Do(ctx context.Context, source Oauth2Source, req *http.Request) (*http.Response, error)
+
+	// RecordTokenValidation increments the token validation counter for the
+	// given result.
+	RecordTokenValidation(result TokenValidationResult)
 }
 
 var _ OAuth2Config = (*Config)(nil)
@@ -79,6 +94,9 @@ type metrics struct {
 	// This is included because it is sometimes more helpful to know the limit
 	// will reset in 600seconds, rather than at 1704000000 unix time.
 	rateLimitResetIn *prometheus.GaugeVec
+
+	// tokenValidationCount counts external auth token validations by result.
+	tokenValidationCount *prometheus.CounterVec
 }
 
 func NewFactory(registry prometheus.Registerer) *Factory {
@@ -142,6 +160,18 @@ func NewFactory(registry prometheus.Registerer) *Factory {
 			}, []string{
 				"name",
 				"resource",
+			}),
+			tokenValidationCount: factory.NewCounterVec(prometheus.CounterOpts{
+				Namespace: "coderd",
+				Subsystem: "oauth2",
+				Name:      "external_requests_token_validation_total",
+				Help: "The total number of external auth token validations by result. " +
+					"'result' is 'confirmed' when the provider confirmed the token, or " +
+					"'rate_limited' when the token was kept optimistically because the " +
+					"validation endpoint was rate-limited.",
+			}, []string{
+				"name",
+				"result",
 			}),
 		},
 	}
@@ -207,6 +237,13 @@ type Config struct {
 func (c *Config) Do(ctx context.Context, source Oauth2Source, req *http.Request) (*http.Response, error) {
 	cli := c.oauthHTTPClient(ctx, source)
 	return cli.Do(req)
+}
+
+func (c *Config) RecordTokenValidation(result TokenValidationResult) {
+	c.metrics.tokenValidationCount.With(prometheus.Labels{
+		"name":   c.name,
+		"result": string(result),
+	}).Inc()
 }
 
 func (c *Config) AuthCodeURL(state string, opts ...oauth2.AuthCodeOption) string {

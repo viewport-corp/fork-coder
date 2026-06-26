@@ -30,6 +30,8 @@ func (c *OAuth2Config) Do(_ context.Context, _ promoauth.Oauth2Source, req *http
 	return c.httpClient.Do(req)
 }
 
+func (*OAuth2Config) RecordTokenValidation(_ promoauth.TokenValidationResult) {}
+
 func (*OAuth2Config) AuthCodeURL(state string, _ ...oauth2.AuthCodeOption) string {
 	return "/?state=" + url.QueryEscape(state)
 }
