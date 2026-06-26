@@ -44,11 +44,25 @@ and `agent_id` attaches it to the workspace agent so the module runs inside the 
 ## Step 1: Add the dotfiles module
 
 Add the `module` block above anywhere in `main.tf`,
-then push a new version of the template:
+then publish a new version of the template:
+
+<div class="tabs">
+
+### UI
+
+In the web editor, add the `module` block to `main.tf`,
+then select **Build** to publish a new version.
+
+### CLI
+
+Add the `module` block to `~/coder-quickstart/main.tf`,
+then publish a new version:
 
 ```sh
 coder templates push -d ~/coder-quickstart -y quickstart
 ```
+
+</div>
 
 Create a workspace from the template.
 The creation form now shows 2 new fields:

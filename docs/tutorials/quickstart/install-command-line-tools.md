@@ -104,8 +104,24 @@ Both work. So far, the two package managers look interchangeable.
 
 ## Step 3: Restart the workspace and compare
 
-Restart the workspace from the Coder dashboard.
+Restart the workspace.
 The restart rebuilds the container from the image and keeps only your home directory.
+
+<div class="tabs">
+
+### UI
+
+Open your workspace in the Coder dashboard and select **Restart**.
+
+### CLI
+
+Restart the workspace from a terminal on your own machine:
+
+```sh
+coder restart <your-workspace>
+```
+
+</div>
 
 Open a terminal and run both commands again:
 

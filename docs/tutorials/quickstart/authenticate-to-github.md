@@ -39,11 +39,25 @@ data "coder_external_auth" "github" {
 ## Step 1: Require GitHub authentication
 
 Add the `coder_external_auth` block to `main.tf`,
-then push a new version of the template:
+then publish a new version of the template:
+
+<div class="tabs">
+
+### UI
+
+In the web editor, add the `coder_external_auth` block to `main.tf`,
+then select **Build** to publish a new version.
+
+### CLI
+
+Add the block to `~/coder-quickstart/main.tf`,
+then publish a new version:
 
 ```sh
 coder templates push -d ~/coder-quickstart -y quickstart
 ```
+
+</div>
 
 ## Step 2: Watch the build wait on a missing provider
 

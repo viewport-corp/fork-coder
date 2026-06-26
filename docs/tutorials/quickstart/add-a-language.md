@@ -3,10 +3,9 @@
 Now that you've finished [Launch your first workspace](./launch-workspace.md),
 you can add another language toolchain to every workspace you create.
 
-The Quickstart template installs a language only when the workspace owner selects it from the **Programming Languages** parameter.
-In this guide, you add Ruby as an option,
-watch a deliberate mistake fail,
-and fix it so selecting Ruby installs a working Ruby toolchain.
+The Quickstart template installs a language only when the workspace owner
+selects it from the **Programming Languages** parameter.
+In this guide, you add Ruby as an option.
 
 > [!NOTE]
 > This guide assumes your Quickstart template is open for editing.
@@ -15,24 +14,27 @@ and fix it so selecting Ruby installs a working Ruby toolchain.
 ## What you'll do
 
 - ✅ Add a Ruby option to the **Programming Languages** parameter.
-- ✅ Learn why the option alone doesn't install Ruby.
-- ✅ Install the Ruby toolchain when a workspace starts.
+- ✅ Publish the change and apply it to your running workspace.
+- ✅ Install the Ruby toolchain so selecting Ruby works.
 
 ## Parameters in brief
 
 A parameter is a question Coder asks when someone creates a workspace.
 Each parameter comes from a `coder_parameter` [data source](https://developer.hashicorp.com/terraform/language/data-sources) in the template.
-A data source reads input;
-it doesn't build infrastructure on its own.
-
 The **Programming Languages** parameter is a multi-select list,
 and each language the reader can choose is an `option` block:
 
 ```tf
 data "coder_parameter" "languages" {
-  name      = "languages"
-  type      = "list(string)"
-  form_type = "multi-select"
+  name         = "languages"
+  display_name = "Programming Languages"
+  description  = "Select the languages to pre-install in your workspace"
+  type         = "list(string)"
+  form_type    = "multi-select"
+  default      = jsonencode(["python"])
+  mutable      = true
+  icon         = "/icon/code.svg"
+  order        = 1
 
   option {
     name  = "Python"
@@ -43,16 +45,16 @@ data "coder_parameter" "languages" {
 }
 ```
 
-The parameter controls the form.
-It doesn't install anything.
-A separate startup script reads the selected values and installs each toolchain.
-That split matters,
-because the rest of this guide builds on it.
+Adding an `option` adds a choice to that list.
 
 ## Step 1: Add the Ruby option
 
-Open `main.tf` and find the `data "coder_parameter" "languages"` block.
-Add a Ruby `option` alongside the existing options:
+In `main.tf`, find the `data "coder_parameter" "languages"` block (it starts at
+line 31).
+The last option, **C/C++**, ends at line 71,
+and the parameter's closing brace is line 72.
+Add a Ruby `option` between lines 71 and 72,
+after the last option and before the closing brace:
 
 ```tf
   option {
@@ -63,25 +65,119 @@ Add a Ruby `option` alongside the existing options:
 ```
 
 > [!IMPORTANT]
-> The `option` block must sit at the same indentation as the other `option` blocks inside the parameter.
+> The `option` block must sit at the same indentation as the other `option`
+> blocks inside the parameter.
 > Coder reads the parameter's choices from these blocks,
 > so a misplaced `option` doesn't appear in the form.
 
-Push a new version of the template:
+Now publish the change as a new template version:
+
+<div class="tabs">
+
+### UI
+
+In the web editor, make the edit above in `main.tf`,
+then select **Build** to publish a new version.
+
+### CLI
+
+Make the edit in `~/coder-quickstart/main.tf`,
+then publish a new version:
 
 ```sh
 coder templates push -d ~/coder-quickstart -y quickstart
 ```
 
-Create a workspace from the template.
-Ruby now appears in the **Programming Languages** list.
-Select it,
-create the workspace,
-and open a terminal once the workspace starts.
+</div>
 
-## Step 2: Watch the option fail on its own
+<details>
+<summary>Final code: the updated parameter</summary>
 
-Check the Ruby version in the workspace terminal:
+The whole `languages` parameter, with Ruby added as the last option:
+
+```tf
+data "coder_parameter" "languages" {
+  name         = "languages"
+  display_name = "Programming Languages"
+  description  = "Select the languages to pre-install in your workspace"
+  type         = "list(string)"
+  form_type    = "multi-select"
+  default      = jsonencode(["python"])
+  mutable      = true
+  icon         = "/icon/code.svg"
+  order        = 1
+
+  option {
+    name  = "Python"
+    value = "python"
+    icon  = "/icon/python.svg"
+  }
+  option {
+    name  = "Node.js"
+    value = "nodejs"
+    icon  = "/icon/nodejs.svg"
+  }
+  option {
+    name  = "Go"
+    value = "go"
+    icon  = "/icon/go.svg"
+  }
+  option {
+    name  = "Rust"
+    value = "rust"
+    icon  = "/icon/rust.svg"
+  }
+  option {
+    name  = "Java"
+    value = "java"
+    icon  = "/icon/java.svg"
+  }
+  option {
+    name  = "C/C++"
+    value = "cpp"
+    icon  = "/icon/cpp.svg"
+  }
+  option {
+    name  = "Ruby"
+    value = "ruby"
+    icon  = "/icon/ruby.svg"
+  }
+}
+```
+
+</details>
+
+## Step 2: Add Ruby to your workspace
+
+Your workspace from [Launch your first workspace](./launch-workspace.md) is
+still on the old template version.
+Update it to the version you just published,
+and add Ruby to its **Programming Languages** selection:
+
+<div class="tabs">
+
+### UI
+
+1. Open your workspace and select **Update**.
+2. In the parameters, add **Ruby** to **Programming Languages**.
+3. Confirm to rebuild the workspace on the new version.
+
+### CLI
+
+Update the workspace and re-select its parameters:
+
+```sh
+coder update <your-workspace> --always-prompt
+```
+
+When prompted for **Programming Languages**, add **Ruby**,
+then let the workspace rebuild.
+
+</div>
+
+## Step 3: Check whether Ruby is installed
+
+When the workspace restarts, open a terminal and ask for the Ruby version:
 
 ```sh
 ruby --version
@@ -93,17 +189,15 @@ The command fails:
 ruby: command not found
 ```
 
-The option appeared in the form,
-you selected it,
-and Ruby is still missing.
-Nothing installed Ruby.
-The parameter changed the question Coder asked,
-but no code acted on the answer.
-This is the split from [Parameters in brief](#parameters-in-brief):
-the parameter is the form,
-and a startup script is what builds the workspace.
+You added the option, selected it, and rebuilt the workspace, but Ruby isn't
+there.
+Adding the `option` only changed the form.
+It added Ruby to the list of choices,
+but nothing in the template acts on that choice yet.
+A separate startup script installs each selected toolchain,
+and you haven't taught it about Ruby.
 
-## Step 3: Install Ruby when the workspace starts
+## Step 4: Install Ruby when the workspace starts
 
 The template installs each selected language from `install-languages.sh.tftpl`,
 a startup script that runs when the workspace boots.
@@ -126,34 +220,64 @@ The script installs Ruby with `apt-get`,
 the package manager built into the workspace image.
 
 > [!WARNING]
-> Use the package manager the workspace image provides,
-> not a personal one.
-> If you replace the `apt-get` line with `brew install ruby`,
-> the build fails:
+> Use the package manager the workspace image provides, not a personal one.
+> If you replace the `apt-get` line with `brew install ruby`, the build fails:
 > the `codercom/enterprise-base:ubuntu` image doesn't include Homebrew,
 > so the workspace logs `brew: command not found` and Ruby never installs.
-> The image ships `apt-get`,
-> so install system packages with it,
-> as the rest of this script does.
-> Use `apt-get install -y ruby-full` instead.
 > To install a personal tool like a Homebrew formula in your own workspace,
 > refer to [Install your own command-line tools](./install-command-line-tools.md).
 
-Push the template again:
+Publish the change, then update your workspace again:
+
+<div class="tabs">
+
+### UI
+
+In the web editor, make the edit above in `install-languages.sh.tftpl`,
+then select **Build** to publish a new version.
+Open your workspace and select **Update** to rebuild it.
+
+### CLI
+
+Make the edit in `~/coder-quickstart/install-languages.sh.tftpl`,
+then publish and update:
 
 ```sh
 coder templates push -d ~/coder-quickstart -y quickstart
+coder update <your-workspace>
 ```
 
-Create a fresh workspace with Ruby selected,
-open a terminal,
-and check the version again:
+</div>
+
+Ruby is already selected, so you don't change parameters this time.
+When the workspace restarts, open a terminal and check again:
 
 ```sh
 ruby --version
 ```
 
 This time the workspace reports a Ruby version.
+
+<details>
+<summary>Final code: the Ruby install branch</summary>
+
+Add this branch alongside the other language branches in
+`install-languages.sh.tftpl`:
+
+```sh
+if echo "$LANGUAGES" | grep -q "ruby"; then
+  if command -v ruby >/dev/null 2>&1; then
+    echo "Ruby: $(ruby --version | head -1)"
+  else
+    echo "Installing Ruby toolchain..."
+    apt_update
+    sudo apt-get install -y -qq ruby-full
+    echo "Installed Ruby: $(ruby --version | head -1)"
+  fi
+fi
+```
+
+</details>
 
 ## What just happened
 
@@ -165,6 +289,56 @@ You changed two different things to add one language:
 A parameter collects a choice.
 A startup script acts on it.
 A new language needs both.
+
+<details>
+<summary>How does Coder install the language you pick?</summary>
+
+The selection travels through the template in four steps:
+
+1. The `option` block in `data "coder_parameter" "languages"` (`main.tf`)
+   adds `ruby` to the values the form accepts.
+2. When the workspace builds, `local.languages` decodes the selection
+   (`main.tf` line 193):
+
+   ```tf
+   languages = jsondecode(data.coder_parameter.languages.value)
+   ```
+
+3. `coder_script.install_languages` renders the startup script with that list
+   and runs it on the agent (`main.tf` lines 264-273):
+
+   ```tf
+   script = templatefile("${path.module}/install-languages.sh.tftpl", {
+     LANGUAGES = join(",", local.languages)
+   })
+   ```
+
+4. Inside the rendered script, the `ruby` branch matches and installs the
+   toolchain:
+
+   ```sh
+   if echo "$LANGUAGES" | grep -q "ruby"; then
+   ```
+
+The first three steps ran as soon as you added the option, which is why Ruby
+appeared in the form.
+Step 4 is the part you were missing in Step 3,
+so the script had nothing to do for `ruby`.
+
+</details>
+
+<details>
+<summary>Why a <code>.tftpl</code> file instead of a plain script?</summary>
+
+The install script needs to know which languages the workspace owner selected,
+and only Terraform has that value when the workspace builds.
+`templatefile()` renders `install-languages.sh.tftpl` and replaces
+`${LANGUAGES}` with `join(",", local.languages)`,
+producing a finished script with the selection baked in.
+A static `.sh` file couldn't receive that value,
+so the `.tftpl` is the bridge between the parameter and the shell script.
+
+</details>
 
 ## What's next?
 
